@@ -26,34 +26,47 @@
         import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, deleteDoc, updateDoc, where, getDocs } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        async function initFirebase() {
+            try {
+                // Pastikan konfigurasi tersedia
+                if (typeof __firebase_config === 'undefined') {
+                    throw new Error("Firebase config not found");
+                }
 
-        // Global bridge for React
-        window.fb = { 
-            auth, 
-            db, 
-            methods: { 
-                onAuthStateChanged, 
-                collection, 
-                query, 
-                onSnapshot, 
-                doc, 
-                setDoc, 
-                addDoc, 
-                deleteDoc, 
-                updateDoc, 
-                where, 
-                getDocs, 
-                signInWithCustomToken, 
-                signInAnonymously 
-            } 
-        };
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getFirestore(app);
 
-        // Notify that Firebase is ready
-        window.dispatchEvent(new Event('firebase-ready'));
+                // Bridge global untuk React
+                window.fb = { 
+                    auth, 
+                    db, 
+                    methods: { 
+                        onAuthStateChanged, 
+                        collection, 
+                        query, 
+                        onSnapshot, 
+                        doc, 
+                        setDoc, 
+                        addDoc, 
+                        deleteDoc, 
+                        updateDoc, 
+                        where, 
+                        getDocs, 
+                        signInWithCustomToken, 
+                        signInAnonymously 
+                    } 
+                };
+
+                window.dispatchEvent(new Event('firebase-ready'));
+            } catch (error) {
+                console.error("Gagal inisialisasi Firebase:", error);
+                window.dispatchEvent(new CustomEvent('firebase-error', { detail: error.message }));
+            }
+        }
+
+        initFirebase();
     </script>
 
     <script type="text/babel">
@@ -62,6 +75,7 @@
         const App = () => {
             const [user, setUser] = useState(null);
             const [fbReady, setFbReady] = useState(!!window.fb);
+            const [error, setError] = useState(null);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [classes, setClasses] = useState([]);
             const [students, setStudents] = useState([]);
@@ -69,11 +83,23 @@
             const [loading, setLoading] = useState(true);
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'eraport-app';
 
-            // Wait for Firebase to be globally available
             useEffect(() => {
                 const handleFbReady = () => setFbReady(true);
+                const handleFbError = (e) => {
+                    setError(e.detail);
+                    setLoading(false);
+                };
+
                 window.addEventListener('firebase-ready', handleFbReady);
-                return () => window.removeEventListener('firebase-ready', handleFbReady);
+                window.addEventListener('firebase-error', handleFbError);
+                
+                // Jika sudah ready sebelum listener terpasang
+                if (window.fb) setFbReady(true);
+
+                return () => {
+                    window.removeEventListener('firebase-ready', handleFbReady);
+                    window.removeEventListener('firebase-error', handleFbError);
+                };
             }, []);
 
             useEffect(() => {
@@ -88,6 +114,7 @@
                         }
                     } catch (err) {
                         console.error("Auth error:", err);
+                        setError("Gagal melakukan login otomatis.");
                     }
                 };
 
@@ -102,34 +129,46 @@
             useEffect(() => {
                 if (!user || !fbReady) return;
 
+                // Listener Firestore dengan proteksi error
                 const unsubClasses = window.fb.methods.onSnapshot(
                     window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes'),
                     (snap) => setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error(err)
+                    (err) => console.error("Firestore Classes Error:", err)
                 );
                 const unsubStudents = window.fb.methods.onSnapshot(
                     window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students'),
                     (snap) => setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error(err)
+                    (err) => console.error("Firestore Students Error:", err)
                 );
                 const unsubScores = window.fb.methods.onSnapshot(
                     window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'),
                     (snap) => setScores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error(err)
+                    (err) => console.error("Firestore Scores Error:", err)
                 );
                 return () => { unsubClasses(); unsubStudents(); unsubScores(); };
             }, [user, fbReady]);
+
+            if (error) return (
+                <div className="h-screen flex flex-col items-center justify-center p-6 text-center">
+                    <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+                        <i data-lucide="alert-circle" className="w-10 h-10"></i>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Terjadi Kesalahan</h2>
+                    <p className="text-gray-500 max-w-md">{error}</p>
+                    <button onClick={() => window.location.reload()} className="mt-6 bg-blue-600 text-white px-6 py-2 rounded-xl font-bold">Coba Lagi</button>
+                </div>
+            );
 
             if (loading) return (
                 <div className="h-screen flex flex-col items-center justify-center gap-4">
                     <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                     <p className="text-gray-500 font-medium tracking-wide">Menyiapkan Aplikasi...</p>
+                    <p className="text-[10px] text-gray-300">Menghubungkan ke server data...</p>
                 </div>
             );
 
             return (
                 <div className="flex min-h-screen">
-                    {/* Sidebar */}
                     <aside className="w-64 bg-white border-r border-gray-100 flex flex-col p-6 space-y-8">
                         <div className="flex items-center gap-3 text-blue-600 font-bold text-xl">
                             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">R</div>
@@ -148,11 +187,10 @@
                             ))}
                         </nav>
                         <div className="pt-6 border-t border-gray-100 text-xs text-gray-400">
-                            User ID: {user?.uid || 'Guest'}
+                            User ID: {user?.uid ? user.uid.substring(0, 8) + '...' : 'Guest'}
                         </div>
                     </aside>
 
-                    {/* Main Content */}
                     <main className="flex-1 p-10 overflow-y-auto h-screen bg-gray-50/30">
                         {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
                         {activeTab === 'manajemen' && <ManajemenData classes={classes} students={students} user={user} appId={appId} />}
@@ -164,7 +202,7 @@
         };
 
         const Dashboard = ({ classes, students, scores }) => {
-            useEffect(() => { window.lucide && window.lucide.createIcons(); }, []);
+            useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
             return (
                 <div className="space-y-8 animate-in fade-in">
                     <h1 className="text-3xl font-extrabold text-gray-900">Ringkasan Sistem</h1>
@@ -191,16 +229,16 @@
             const [studentName, setStudentName] = useState('');
             const [selectedClassId, setSelectedClassId] = useState('');
 
-            useEffect(() => { window.lucide && window.lucide.createIcons(); }, []);
+            useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
             const addClass = async () => {
-                if (!newClass) return;
+                if (!newClass || !user) return;
                 await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: newClass });
                 setNewClass('');
             };
 
             const addStudent = async () => {
-                if (!studentName || !selectedClassId) return alert('Lengkapi nama siswa dan pilih kelas!');
+                if (!studentName || !selectedClassId || !user) return alert('Lengkapi nama siswa dan pilih kelas!');
                 await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students'), { 
                     name: studentName, 
                     classId: selectedClassId 
@@ -273,7 +311,7 @@
             const [inputData, setInputData] = useState({});
             const [bulkVal, setBulkVal] = useState('');
 
-            useEffect(() => { window.lucide && window.lucide.createIcons(); }, []);
+            useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
             const filteredStudents = useMemo(() => students.filter(s => s.classId === selClass), [students, selClass]);
 
@@ -287,7 +325,7 @@
             };
 
             const saveAll = async () => {
-                if (!selClass || !selSubject || !meetingName) return alert('Lengkapi data!');
+                if (!selClass || !selSubject || !meetingName || !user) return alert('Lengkapi data!');
                 for (const studentId of Object.keys(inputData)) {
                     await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), {
                         studentId, classId: selClass, subject: selSubject, meeting: meetingName,
@@ -362,7 +400,7 @@
         const EksporHasil = ({ classes, students, scores }) => {
             const [selClass, setSelClass] = useState('');
 
-            useEffect(() => { window.lucide && window.lucide.createIcons(); }, []);
+            useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
             const exportData = () => {
                 const meetingTypes = Array.from(new Set(scores.map(s => s.meeting)));
