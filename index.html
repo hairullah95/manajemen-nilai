@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Raport: Sistem Manajemen Nilai</title>
+    <title>E-Raport Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -11,14 +11,10 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; background-color: #f8fafc; color: #0f172a; overflow: hidden; }
-        .fade-in { animation: fadeIn 0.2s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .sidebar-item-active { background-color: #2563eb; color: white; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4); }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfcfd; }
+        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(229, 231, 235, 0.5); }
+        .sidebar-active { background: #2563eb; color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
     </style>
 </head>
 <body>
@@ -26,436 +22,351 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, deleteDoc, updateDoc, where, getDocs } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyAlXDVBSJryVlGwtZWYL_BNnh6-7R-SbXk",
-            authDomain: "jurnal-guru-f06df.firebaseapp.com",
-            projectId: "jurnal-guru-f06df",
-            storageBucket: "jurnal-guru-f06df.firebasestorage.app",
-            messagingSenderId: "782875410114",
-            appId: "1:782875410114:web:702b8b802901b71d16055b",
-            measurementId: "G-9LCGMFSPMM"
-        };
-
+        const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const provider = new GoogleAuthProvider();
 
-        window.fbAuth = auth;
-        window.fbDb = db;
-        window.fbProvider = provider;
-        window.fbUtils = { signInWithPopup, signOut, onAuthStateChanged, collection, query, onSnapshot, doc, setDoc, addDoc, deleteDoc, updateDoc, where, getDocs };
+        window.fb = { auth, db, providers: { google: new GoogleAuthProvider() }, methods: { signInWithPopup, signOut, onAuthStateChanged, collection, query, onSnapshot, doc, setDoc, addDoc, deleteDoc, updateDoc, where, getDocs, signInWithCustomToken, signInAnonymously } };
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useCallback } = React;
-
-        const Icon = ({ name, size = 20, className = "" }) => {
-            useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
-            }, [name]);
-            return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
-        };
+        const { useState, useEffect, useMemo } = React;
 
         const App = () => {
             const [user, setUser] = useState(null);
-            const [authLoading, setAuthLoading] = useState(true);
             const [activeTab, setActiveTab] = useState('dashboard');
-            
             const [classes, setClasses] = useState([]);
             const [students, setStudents] = useState([]);
             const [scores, setScores] = useState([]);
-            
-            const [selectedClass, setSelectedClass] = useState('');
-            const [selectedSubject, setSelectedSubject] = useState('');
-            const [meetingName, setMeetingName] = useState('');
+            const [loading, setLoading] = useState(true);
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'eraport-app';
 
             useEffect(() => {
-                const unsubscribe = window.fbUtils.onAuthStateChanged(window.fbAuth, (currentUser) => {
-                    setUser(currentUser);
-                    setAuthLoading(false);
+                const initAuth = async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await window.fb.methods.signInWithCustomToken(window.fb.auth, __initial_auth_token);
+                    } else {
+                        await window.fb.methods.signInAnonymously(window.fb.auth);
+                    }
+                };
+                initAuth();
+                return window.fb.methods.onAuthStateChanged(window.fb.auth, (u) => {
+                    setUser(u);
+                    setLoading(false);
                 });
-                return () => unsubscribe();
             }, []);
 
             useEffect(() => {
                 if (!user) return;
-                const appId = 'manajemen-nilai-siswa';
-                const userId = user.uid;
-
-                const unsubClasses = window.fbUtils.onSnapshot(window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'classes'), (snap) => {
-                    setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                });
-                const unsubStudents = window.fbUtils.onSnapshot(window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'students'), (snap) => {
-                    setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                });
-                const unsubScores = window.fbUtils.onSnapshot(window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'scores'), (snap) => {
-                    setScores(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                });
-
+                const unsubClasses = window.fb.methods.onSnapshot(
+                    window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes'),
+                    (snap) => setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+                    (err) => console.error(err)
+                );
+                const unsubStudents = window.fb.methods.onSnapshot(
+                    window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students'),
+                    (snap) => setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+                    (err) => console.error(err)
+                );
+                const unsubScores = window.fb.methods.onSnapshot(
+                    window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'),
+                    (snap) => setScores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+                    (err) => console.error(err)
+                );
                 return () => { unsubClasses(); unsubStudents(); unsubScores(); };
             }, [user]);
 
-            const handleLogout = () => window.fbUtils.signOut(window.fbAuth);
-
-            if (authLoading) return <div className="h-screen flex items-center justify-center bg-white"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
-
-            if (!user) return (
-                <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-                    <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10 text-center space-y-6">
-                        <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg"><Icon name="book-open" size={40} className="text-white"/></div>
-                        <h1 className="text-3xl font-black text-slate-800 tracking-tight">E-Raport</h1>
-                        <p className="text-slate-500">Sistem Manajemen Nilai Siswa</p>
-                        <button onClick={() => window.fbUtils.signInWithPopup(window.fbAuth, window.fbProvider)} className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 py-4 rounded-2xl font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google"/> Masuk dengan Google
-                        </button>
-                    </div>
-                </div>
-            );
+            if (loading) return <div className="h-screen flex items-center justify-center">Memuat...</div>;
 
             return (
-                <div className="min-h-screen flex overflow-hidden bg-slate-50">
-                    <aside className="w-64 bg-slate-900 text-white h-screen flex flex-col shrink-0 shadow-2xl z-30">
-                        <div className="text-2xl font-bold flex items-center gap-2 p-6 mb-4">
-                            <div className="p-2 bg-blue-600 rounded-lg"><Icon name="book-open" size={24} /></div>
-                            <span>E-Raport</span>
+                <div className="flex min-h-screen">
+                    {/* Sidebar */}
+                    <aside className="w-64 bg-white border-r border-gray-100 flex flex-col p-6 space-y-8">
+                        <div className="flex items-center gap-3 text-blue-600 font-bold text-xl">
+                            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">R</div>
+                            E-Raport
                         </div>
-                        <nav className="flex-1 px-4 space-y-1">
+                        <nav className="flex-1 space-y-2">
                             {[
-                                { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
-                                { id: 'data-siswa', label: 'Data & Impor', icon: 'users' },
-                                { id: 'input-nilai', label: 'Input Nilai', icon: 'clipboard-check' },
-                                { id: 'rekap', label: 'Rekap Nilai', icon: 'file-text' }
-                            ].map((item) => (
-                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${activeTab === item.id ? 'sidebar-item-active' : 'hover:bg-slate-800 text-slate-400'}`}>
-                                    <Icon name={item.icon} size={20} /> <span className="font-semibold text-sm">{item.label}</span>
+                                { id: 'dashboard', label: 'Dashboard', icon: 'layout' },
+                                { id: 'manajemen', label: 'Data Kelas & Siswa', icon: 'users' },
+                                { id: 'input', label: 'Input Nilai', icon: 'edit-3' },
+                                { id: 'ekspor', label: 'Ekspor Hasil', icon: 'download' }
+                            ].map(item => (
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl font-medium transition-all ${activeTab === item.id ? 'sidebar-active' : 'text-gray-500 hover:bg-gray-50'}`}>
+                                    <i data-lucide={item.icon} className="w-5 h-5"></i> {item.label}
                                 </button>
                             ))}
                         </nav>
-                        <div className="p-4 border-t border-slate-800">
-                            <div className="flex items-center gap-3 p-2 mb-4">
-                                <img src={user.photoURL} className="w-9 h-9 rounded-full border border-blue-500" />
-                                <div className="truncate"><p className="text-xs font-bold truncate text-white">{user.displayName}</p></div>
-                            </div>
-                            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-bold text-xs transition-colors"><Icon name="log-out" size={16} /> Keluar</button>
+                        <div className="pt-6 border-t border-gray-100 text-xs text-gray-400">
+                            User ID: {user.uid}
                         </div>
                     </aside>
 
-                    <main className="flex-1 h-screen overflow-y-auto bg-slate-50 relative">
-                        <div className="max-w-7xl mx-auto p-8 w-full min-h-full">
-                            {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
-                            {activeTab === 'data-siswa' && <StudentManager classes={classes} students={students} user={user} />}
-                            {activeTab === 'input-nilai' && <ScoreInput classes={classes} students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} selectedSubject={selectedSubject} setSelectedSubject={setSelectedSubject} meetingName={meetingName} setMeetingName={setMeetingName} user={user} setActiveTab={setActiveTab} />}
-                            {activeTab === 'rekap' && <ReportSummary scores={scores} students={students} classes={classes} user={user} />}
-                        </div>
+                    {/* Main Content */}
+                    <main className="flex-1 p-10 overflow-y-auto h-screen bg-gray-50/30">
+                        {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
+                        {activeTab === 'manajemen' && <ManajemenData classes={classes} students={students} user={user} appId={appId} />}
+                        {activeTab === 'input' && <InputNilai classes={classes} students={students} user={user} appId={appId} />}
+                        {activeTab === 'ekspor' && <EksporHasil classes={classes} students={students} scores={scores} />}
                     </main>
                 </div>
             );
         };
 
         const Dashboard = ({ classes, students, scores }) => {
-            const [dashFilterClass, setDashFilterClass] = useState('');
-
-            const studentAverages = useMemo(() => {
-                let filteredList = students;
-                if (dashFilterClass) filteredList = students.filter(s => s.classId === dashFilterClass);
-
-                return filteredList.map(student => {
-                    const studentScores = scores.filter(s => s.studentId === student.id);
-                    if (studentScores.length === 0) return { ...student, avg: 0, count: 0 };
-                    const totalFinal = studentScores.reduce((acc, curr) => acc + (curr.kog * 0.4 + curr.psi * 0.3 + curr.afe * 0.3), 0);
-                    return { ...student, avg: parseFloat((totalFinal / studentScores.length).toFixed(2)), count: studentScores.length };
-                }).sort((a, b) => b.avg - a.avg || a.name.localeCompare(b.name));
-            }, [students, scores, dashFilterClass]);
-
+            useEffect(() => { window.lucide && window.lucide.createIcons(); }, []);
             return (
-                <div className="space-y-8 fade-in">
-                    <header>
-                        <h2 className="text-3xl font-black text-slate-800 tracking-tight">Dashboard</h2>
-                        <p className="text-slate-500">Analisis performa siswa secara otomatis.</p>
-                    </header>
+                <div className="space-y-8 animate-in fade-in">
+                    <h1 className="text-3xl font-extrabold text-gray-900">Ringkasan Sistem</h1>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                            <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl"><Icon name="grid" size={28}/></div>
-                            <div><p className="text-slate-400 text-[10px] font-black uppercase">Kelas</p><h3 className="text-2xl font-black">{classes.length}</h3></div>
+                        <div className="glass-card p-6 rounded-3xl flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><i data-lucide="grid"></i></div>
+                            <div><p className="text-gray-400 text-sm">Total Kelas</p><h2 className="text-2xl font-bold">{classes.length}</h2></div>
                         </div>
-                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                            <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon name="users" size={28}/></div>
-                            <div><p className="text-slate-400 text-[10px] font-black uppercase">Siswa</p><h3 className="text-2xl font-black">{students.length}</h3></div>
+                        <div className="glass-card p-6 rounded-3xl flex items-center gap-4">
+                            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><i data-lucide="users"></i></div>
+                            <div><p className="text-gray-400 text-sm">Total Siswa</p><h2 className="text-2xl font-bold">{students.length}</h2></div>
                         </div>
-                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                            <div className="p-4 bg-orange-50 text-orange-600 rounded-2xl"><Icon name="database" size={28}/></div>
-                            <div><p className="text-slate-400 text-[10px] font-black uppercase">Entri Nilai</p><h3 className="text-2xl font-black">{scores.length}</h3></div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                        <div className="p-8 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <h3 className="font-black text-xl text-slate-800">Ranking Siswa</h3>
-                            <select value={dashFilterClass} onChange={e => setDashFilterClass(e.target.value)} className="bg-slate-50 border-none text-xs font-black uppercase rounded-xl px-4 py-2">
-                                <option value="">Semua Kelas</option>
-                                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-slate-50/50 text-slate-400 font-black uppercase text-[10px] tracking-widest">
-                                    <tr><th className="p-6 text-left">Rank</th><th className="p-6 text-left">Nama</th><th className="p-6 text-center">Kelas</th><th className="p-6 text-right">Rata-rata</th></tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {studentAverages.map((s, idx) => (
-                                        <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="p-6"><div className={`w-7 h-7 flex items-center justify-center rounded-lg font-black text-xs ${idx === 0 ? 'bg-yellow-400 text-white' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</div></td>
-                                            <td className="p-6 font-bold uppercase tracking-tight text-slate-700">{s.name}</td>
-                                            <td className="p-6 text-center font-bold text-slate-400 text-xs">{classes.find(c => c.id === s.classId)?.name || '-'}</td>
-                                            <td className="p-6 text-right"><span className={`px-4 py-2 rounded-xl font-black text-sm ${s.avg >= 80 ? 'bg-emerald-500 text-white' : 'bg-blue-500 text-white'}`}>{s.avg}</span></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div className="glass-card p-6 rounded-3xl flex items-center gap-4">
+                            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><i data-lucide="database"></i></div>
+                            <div><p className="text-gray-400 text-sm">Total Nilai</p><h2 className="text-2xl font-bold">{scores.length}</h2></div>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        const StudentManager = ({ classes, students, user }) => {
+        const ManajemenData = ({ classes, students, user, appId }) => {
+            const [newClass, setNewClass] = useState('');
             const [isImporting, setIsImporting] = useState(false);
-            const [importLog, setImportLog] = useState('');
 
-            const handleExcelImport = async (e) => {
+            const addClass = async () => {
+                if (!newClass) return;
+                await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: newClass });
+                setNewClass('');
+            };
+
+            const handleImport = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 setIsImporting(true);
-                setImportLog('Membaca file...');
                 const reader = new FileReader();
                 reader.onload = async (evt) => {
-                    try {
-                        const workbook = XLSX.read(evt.target.result, { type: 'binary' });
-                        const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
-                        
-                        const appId = 'manajemen-nilai-siswa';
-                        const userId = user.uid;
-                        
-                        // Header check: 0: Nama, 1: Kelas, 2: Mapel, 3+: Nilai per Tipe
-                        const headers = json[0];
-                        const rows = json.slice(1);
+                    const workbook = XLSX.read(evt.target.result, { type: 'binary' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    
+                    const headers = data[0];
+                    const rows = data.slice(1);
 
-                        for (const row of rows) {
-                            if (!row[0] || !row[1]) continue;
-                            const name = String(row[0]).trim();
-                            const className = String(row[1]).trim();
-                            const subject = String(row[2] || 'Umum').trim();
+                    for (const row of rows) {
+                        if (!row[0] || !row[1]) continue;
+                        const name = row[0];
+                        const className = row[1];
+                        const subject = row[2] || 'Umum';
 
-                            setImportLog(`Memproses: ${name} (${className})`);
-
-                            // 1. Dapatkan atau buat kelas
-                            let classId = classes.find(c => c.name === className)?.id;
-                            if (!classId) {
-                                const newClassRef = await window.fbUtils.addDoc(window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'classes'), { name: className });
-                                classId = newClassRef.id;
-                            }
-
-                            // 2. Dapatkan atau buat siswa
-                            let studentId = students.find(s => s.name === name && s.classId === classId)?.id;
-                            if (!studentId) {
-                                const newStudentRef = await window.fbUtils.addDoc(window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'students'), { name, classId });
-                                studentId = newStudentRef.id;
-                            }
-
-                            // 3. Simpan Nilai berdasarkan kolom header tipe
-                            for (let colIdx = 3; colIdx < row.length; colIdx++) {
-                                const meetingType = headers[colIdx] || `Tipe ${colIdx - 2}`;
-                                const val = parseFloat(row[colIdx]) || 0;
-                                
-                                await window.fbUtils.addDoc(window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'scores'), {
-                                    studentId, classId, subject, meeting: meetingType,
-                                    kog: val, psi: val, afe: val, // Default disamakan karena format minta "Nilai Akhir"
-                                    timestamp: new Date().toISOString()
-                                });
-                            }
+                        let classObj = classes.find(c => c.name === className);
+                        let classId = classObj?.id;
+                        if (!classId) {
+                            const newCRef = await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: className });
+                            classId = newCRef.id;
                         }
-                        alert("Impor Berhasil!");
-                    } catch (err) {
-                        alert("Terjadi kesalahan impor.");
-                    } finally {
-                        setIsImporting(false);
-                        setImportLog('');
-                        e.target.value = '';
+
+                        let studentObj = students.find(s => s.name === name && s.classId === classId);
+                        let studentId = studentObj?.id;
+                        if (!studentId) {
+                            const newSRef = await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students'), { name, classId });
+                            studentId = newSRef.id;
+                        }
+
+                        for (let i = 3; i < row.length; i++) {
+                            const val = parseFloat(row[i]) || 0;
+                            const type = headers[i] || `Tipe ${i-2}`;
+                            await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), {
+                                studentId, classId, subject, meeting: type,
+                                kog: val, psi: val, afe: val, timestamp: new Date().toISOString()
+                            });
+                        }
                     }
+                    setIsImporting(false);
+                    alert('Impor Selesai!');
                 };
                 reader.readAsBinaryString(file);
             };
 
             return (
-                <div className="space-y-8 fade-in">
-                    <header><h2 className="text-3xl font-black text-slate-800">Data & Impor</h2></header>
-                    <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 text-center space-y-6">
-                        <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto"><Icon name="file-spreadsheet" size={40}/></div>
-                        <div className="max-w-md mx-auto">
-                            <h3 className="text-xl font-black">Impor Multi-Kolom</h3>
-                            <p className="text-slate-400 text-sm mt-2">Format: Kolom 1 (Nama), 2 (Kelas), 3 (Mapel), 4 dst (Nilai per Tipe Penilaian).</p>
-                        </div>
-                        <div className="flex justify-center">
-                            <label className="cursor-pointer bg-slate-900 text-white px-8 py-4 rounded-2xl font-black hover:bg-slate-800 transition-all flex items-center gap-3 shadow-xl">
-                                <Icon name="upload-cloud" /> Pilih File Excel
-                                <input type="file" className="hidden" onChange={handleExcelImport} disabled={isImporting} />
-                            </label>
-                        </div>
-                        {isImporting && <div className="animate-pulse flex flex-col items-center gap-2"><div className="w-12 h-1 bg-blue-600 rounded-full"></div><p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{importLog}</p></div>}
-                    </div>
-                </div>
-            );
-        };
-
-        const ScoreInput = ({ classes, students, selectedClass, setSelectedClass, selectedSubject, setSelectedSubject, meetingName, setMeetingName, user, setActiveTab }) => {
-            const [localScores, setLocalScores] = useState({});
-            const [bulkValue, setBulkValue] = useState({ kog: '', psi: '', afe: '' });
-            
-            const filteredStudents = useMemo(() => students.filter(s => s.classId === selectedClass).sort((a, b) => a.name.localeCompare(b.name)), [students, selectedClass]);
-            
-            // Handle Bulk Update
-            const applyBulk = (field, val) => {
-                setBulkValue(prev => ({ ...prev, [field]: val }));
-                const numVal = parseFloat(val) || 0;
-                const updated = { ...localScores };
-                filteredStudents.forEach(s => {
-                    updated[s.id] = { ...(updated[s.id] || { studentId: s.id, kog: 0, psi: 0, afe: 0 }), [field]: numVal };
-                });
-                setLocalScores(updated);
-            };
-
-            const save = async () => {
-                if (!selectedSubject || !meetingName || !selectedClass) return alert("Lengkapi data!");
-                const entries = Object.values(localScores);
-                if (entries.length === 0) return alert("Isi nilai!");
-                const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'scores');
-                await Promise.all(entries.map(s => window.fbUtils.addDoc(col, { ...s, subject: selectedSubject, meeting: meetingName, classId: selectedClass, timestamp: new Date().toISOString() })));
-                alert("Nilai Berhasil Disimpan!"); setActiveTab('rekap');
-            };
-
-            return (
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-8 fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-3xl">
-                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Kelas</label>
-                        <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="w-full bg-white border-none p-4 rounded-2xl font-bold shadow-sm outline-none">
-                            <option value="">Pilih...</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Mapel</label>
-                        <input value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} placeholder="Matematika" className="w-full bg-white border-none p-4 rounded-2xl font-bold shadow-sm outline-none"/></div>
-                        <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Tipe</label>
-                        <input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="UTS / UH" className="w-full bg-white border-none p-4 rounded-2xl font-bold shadow-sm outline-none"/></div>
+                <div className="space-y-8">
+                    <div className="flex justify-between items-center">
+                        <h1 className="text-3xl font-extrabold text-gray-900">Manajemen Data</h1>
+                        <label className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold cursor-pointer hover:bg-blue-700 transition-all flex items-center gap-2">
+                            <i data-lucide="upload" className="w-5 h-5"></i> {isImporting ? 'Memproses...' : 'Impor Excel Multi-Kolom'}
+                            <input type="file" className="hidden" onChange={handleImport} disabled={isImporting} />
+                        </label>
                     </div>
 
-                    <div className="overflow-hidden border border-slate-100 rounded-3xl">
-                        <table className="w-full text-sm">
-                            <thead className="bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest">
-                                <tr><th className="p-5 text-left">Nama Siswa</th><th className="p-5 text-center w-36">Kognitif</th><th className="p-5 text-center w-36">Psiko</th><th className="p-5 text-center w-36">Afektif</th></tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {/* Baris Bulk Input */}
-                                <tr className="bg-blue-50/50">
-                                    <td className="p-5 font-black text-blue-600 text-xs italic">ISI MASSAL (COPY SEMUA)</td>
-                                    <td className="p-5"><input type="number" value={bulkValue.kog} onChange={e => applyBulk('kog', e.target.value)} className="w-full bg-white border-2 border-blue-200 p-3 rounded-xl text-center font-black focus:ring-2 focus:ring-blue-600 outline-none" placeholder="Isi..." /></td>
-                                    <td className="p-5"><input type="number" value={bulkValue.psi} onChange={e => applyBulk('psi', e.target.value)} className="w-full bg-white border-2 border-blue-200 p-3 rounded-xl text-center font-black focus:ring-2 focus:ring-blue-600 outline-none" placeholder="Isi..." /></td>
-                                    <td className="p-5"><input type="number" value={bulkValue.afe} onChange={e => applyBulk('afe', e.target.value)} className="w-full bg-white border-2 border-blue-200 p-3 rounded-xl text-center font-black focus:ring-2 focus:ring-blue-600 outline-none" placeholder="Isi..." /></td>
-                                </tr>
-                                {/* Daftar Siswa */}
-                                {filteredStudents.map(s => (
-                                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-5 font-bold text-slate-700 uppercase text-xs">{s.name}</td>
-                                        <td className="p-5"><input type="number" value={localScores[s.id]?.kog || ''} onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), kog:parseFloat(e.target.value)||0}}))} className="w-full bg-slate-100 border-none p-3 rounded-xl text-center font-bold focus:ring-2 focus:ring-blue-500" placeholder="0" /></td>
-                                        <td className="p-5"><input type="number" value={localScores[s.id]?.psi || ''} onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), psi:parseFloat(e.target.value)||0}}))} className="w-full bg-slate-100 border-none p-3 rounded-xl text-center font-bold focus:ring-2 focus:ring-blue-500" placeholder="0" /></td>
-                                        <td className="p-5"><input type="number" value={localScores[s.id]?.afe || ''} onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), afe:parseFloat(e.target.value)||0}}))} className="w-full bg-slate-100 border-none p-3 rounded-xl text-center font-bold focus:ring-2 focus:ring-blue-500" placeholder="0" /></td>
-                                    </tr>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="glass-card p-8 rounded-[2rem] space-y-6">
+                            <h3 className="text-xl font-bold">Tambah Kelas</h3>
+                            <div className="flex gap-2">
+                                <input value={newClass} onChange={e => setNewClass(e.target.value)} className="flex-1 bg-white border border-gray-200 p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: 10 IPA 1" />
+                                <button onClick={addClass} className="bg-gray-900 text-white px-6 rounded-xl font-bold">Simpan</button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                {classes.map(c => (
+                                    <div key={c.id} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center group">
+                                        <span className="font-semibold text-gray-700">{c.name}</span>
+                                        <button onClick={() => window.fb.methods.deleteDoc(window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes', c.id))} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
+                            </div>
+                        </div>
+
+                        <div className="glass-card p-8 rounded-[2rem] space-y-6">
+                            <h3 className="text-xl font-bold">Daftar Siswa ({students.length})</h3>
+                            <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2">
+                                {students.map(s => (
+                                    <div key={s.id} className="p-4 bg-white border border-gray-100 rounded-xl flex justify-between items-center">
+                                        <div>
+                                            <p className="font-bold text-gray-800">{s.name}</p>
+                                            <p className="text-xs text-blue-600 font-bold uppercase">{classes.find(c => c.id === s.classId)?.name || 'Tanpa Kelas'}</p>
+                                        </div>
+                                        <button onClick={() => window.fb.methods.deleteDoc(window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students', s.id))} className="text-red-400 hover:text-red-600"><i data-lucide="x" className="w-4 h-4"></i></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
-                    <button onClick={save} className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black text-lg shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-3"><Icon name="save" /> Simpan Data</button>
                 </div>
             );
         };
 
-        const ReportSummary = ({ scores, students, classes, user }) => {
-            const [filterClass, setFilterClass] = useState('');
-            const [editingId, setEditingId] = useState(null);
-            const [editForm, setEditForm] = useState({ kog: 0, psi: 0, afe: 0 });
+        const InputNilai = ({ classes, students, user, appId }) => {
+            const [selClass, setSelClass] = useState('');
+            const [selSubject, setSelSubject] = useState('');
+            const [meetingName, setMeetingName] = useState('');
+            const [inputData, setInputData] = useState({});
+            const [bulkVal, setBulkVal] = useState('');
 
-            const calculateFinal = (s) => ((s.kog * 0.4) + (s.psi * 0.3) + (s.afe * 0.3)).toFixed(2);
-            
-            const filteredScores = useMemo(() => scores.filter(s => !filterClass || s.classId === filterClass).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)), [scores, filterClass]);
+            const filteredStudents = useMemo(() => students.filter(s => s.classId === selClass), [students, selClass]);
 
-            const exportToExcel = () => {
-                const data = filteredScores.map(s => ({
-                    "Siswa": students.find(st => st.id === s.studentId)?.name || 'N/A',
-                    "Kelas": classes.find(c => c.id === s.classId)?.name || '-',
-                    "Mapel": s.subject,
-                    "Kategori": s.meeting,
-                    "Kognitif": s.kog, "Psikomotor": s.psi, "Afektif": s.afe,
-                    "Nilai Akhir": calculateFinal(s)
-                }));
-                const ws = XLSX.utils.json_to_sheet(data);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Rekap");
-                XLSX.writeFile(wb, "Rekap_Nilai.xlsx");
+            const handleBulk = (val) => {
+                setBulkVal(val);
+                const updated = {};
+                filteredStudents.forEach(s => {
+                    updated[s.id] = parseFloat(val) || 0;
+                });
+                setInputData(updated);
             };
 
-            const handleUpdate = async (id) => {
-                await window.fbUtils.updateDoc(window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'scores', id), {
-                    kog: parseFloat(editForm.kog), psi: parseFloat(editForm.psi), afe: parseFloat(editForm.afe)
-                });
-                setEditingId(null);
+            const saveAll = async () => {
+                if (!selClass || !selSubject || !meetingName) return alert('Lengkapi data!');
+                for (const studentId of Object.keys(inputData)) {
+                    await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), {
+                        studentId, classId: selClass, subject: selSubject, meeting: meetingName,
+                        kog: inputData[studentId], psi: inputData[studentId], afe: inputData[studentId],
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                alert('Tersimpan!');
             };
 
             return (
-                <div className="space-y-6 fade-in">
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-end gap-6">
-                        <div className="flex-1 space-y-2">
-                            <h3 className="font-black text-2xl">Rekapitulasi Penilaian</h3>
-                            <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="bg-slate-50 border-none p-3 rounded-xl text-xs font-black uppercase">
-                                <option value="">Semua Kelas</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                <div className="space-y-8">
+                    <div className="glass-card p-8 rounded-[2rem] grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Pilih Kelas</label>
+                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="w-full bg-gray-50 border-none p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold">
+                                <option value="">Pilih...</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
                         </div>
-                        <button onClick={exportToExcel} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg hover:bg-emerald-700 transition-all flex items-center gap-2"><Icon name="download" size={18} /> Ekspor Excel</button>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Mata Pelajaran</label>
+                            <input value={selSubject} onChange={e => setSelSubject(e.target.value)} placeholder="Matematika" className="w-full bg-gray-50 border-none p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tipe Pertemuan</label>
+                            <input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="Tugas 1" className="w-full bg-gray-50 border-none p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
+                        </div>
                     </div>
 
-                    <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50/50 text-slate-400 font-black uppercase text-[10px] tracking-widest">
-                                    <tr><th className="p-6">Siswa / Tipe</th><th className="p-6">Kelas / Mapel</th><th className="p-6 text-center">K</th><th className="p-6 text-center">P</th><th className="p-6 text-center">A</th><th className="p-6 text-center bg-blue-50 text-blue-600">Nilai Akhir</th><th className="p-6 text-right">Opsi</th></tr>
+                    {selClass && (
+                        <div className="glass-card rounded-[2rem] overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-900 text-white">
+                                    <tr>
+                                        <th className="p-5 font-bold text-sm">Nama Siswa</th>
+                                        <th className="p-5 font-bold text-sm w-48 text-center">Nilai</th>
+                                    </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {filteredScores.map(s => (
-                                        <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-6"><p className="font-black uppercase tracking-tight text-slate-700">{students.find(st => st.id === s.studentId)?.name || 'N/A'}</p><p className="text-[10px] font-bold text-blue-500">{s.meeting}</p></td>
-                                            <td className="p-6"><p className="font-bold text-slate-400 text-xs">{classes.find(c => c.id === s.classId)?.name || '-'}</p><p className="text-[9px] text-slate-400 uppercase font-bold">{s.subject}</p></td>
-                                            <td className="p-6 text-center font-bold">
-                                                {editingId === s.id ? <input type="number" value={editForm.kog} onChange={e => setEditForm({...editForm, kog: e.target.value})} className="w-14 border rounded p-1 text-center" /> : s.kog}
-                                            </td>
-                                            <td className="p-6 text-center font-bold">
-                                                {editingId === s.id ? <input type="number" value={editForm.psi} onChange={e => setEditForm({...editForm, psi: e.target.value})} className="w-14 border rounded p-1 text-center" /> : s.psi}
-                                            </td>
-                                            <td className="p-6 text-center font-bold">
-                                                {editingId === s.id ? <input type="number" value={editForm.afe} onChange={e => setEditForm({...editForm, afe: e.target.value})} className="w-14 border rounded p-1 text-center" /> : s.afe}
-                                            </td>
-                                            <td className="p-6 text-center font-black text-blue-600 bg-blue-50/30">{calculateFinal(s)}</td>
-                                            <td className="p-6 text-right">
-                                                {editingId === s.id ? (
-                                                    <button onClick={() => handleUpdate(s.id)} className="text-emerald-600 p-2"><Icon name="check" /></button>
-                                                ) : (
-                                                    <div className="flex gap-2 justify-end">
-                                                        <button onClick={() => { setEditingId(s.id); setEditForm({kog: s.kog, psi: s.psi, afe: s.afe}); }} className="text-slate-300 hover:text-blue-600"><Icon name="edit-2" size={16}/></button>
-                                                        <button onClick={() => confirm('Hapus?') && window.fbUtils.deleteDoc(window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'scores', s.id))} className="text-slate-300 hover:text-red-500"><Icon name="trash" size={16}/></button>
-                                                    </div>
-                                                )}
+                                <tbody className="divide-y divide-gray-100">
+                                    {/* Baris Bulk */}
+                                    <tr className="bg-blue-50 border-b-2 border-blue-100">
+                                        <td className="p-5 font-black text-blue-600 text-xs italic">ISI SEMUA OTOMATIS (BULK INPUT)</td>
+                                        <td className="p-5">
+                                            <input value={bulkVal} onChange={e => handleBulk(e.target.value)} type="number" className="w-full p-3 rounded-lg border-2 border-blue-200 text-center font-bold" placeholder="Isi..." />
+                                        </td>
+                                    </tr>
+                                    {filteredStudents.map(s => (
+                                        <tr key={s.id}>
+                                            <td className="p-5 font-bold text-gray-700">{s.name}</td>
+                                            <td className="p-5">
+                                                <input value={inputData[s.id] || ''} onChange={e => setInputData({...inputData, [s.id]: parseFloat(e.target.value)||0})} type="number" className="w-full p-3 rounded-lg bg-gray-100 text-center font-bold border-none" placeholder="0" />
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
+                            <div className="p-8">
+                                <button onClick={saveAll} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg">Simpan Penilaian</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const EksporHasil = ({ classes, students, scores }) => {
+            const [selClass, setSelClass] = useState('');
+
+            const getFinalScore = (s) => (s.kog * 0.4 + s.psi * 0.3 + s.afe * 0.3).toFixed(2);
+
+            const exportData = () => {
+                const meetingTypes = Array.from(new Set(scores.map(s => s.meeting)));
+                const rows = students
+                    .filter(s => !selClass || s.classId === selClass)
+                    .map(student => {
+                        const res = { "Nama Siswa": student.name };
+                        meetingTypes.forEach(type => {
+                            const score = scores.find(sc => sc.studentId === student.id && sc.meeting === type);
+                            res[type] = score ? getFinalScore(score) : "-";
+                        });
+                        return res;
+                    });
+                
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Hasil Akhir");
+                XLSX.writeFile(wb, "Rekap_Nilai_Siswa.xlsx");
+            };
+
+            return (
+                <div className="space-y-8 animate-in slide-in-from-bottom-4">
+                    <div className="glass-card p-10 rounded-[2.5rem] text-center space-y-6">
+                        <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto"><i data-lucide="file-spreadsheet" className="w-10 h-10"></i></div>
+                        <div className="max-w-md mx-auto">
+                            <h2 className="text-2xl font-black">Ekspor Hasil Akhir</h2>
+                            <p className="text-gray-400 mt-2">Unduh rekapitulasi nilai akhir siswa berdasarkan setiap tipe pertemuan.</p>
+                        </div>
+                        <div className="flex flex-col items-center gap-4">
+                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="w-full max-w-xs bg-gray-50 p-4 rounded-xl border border-gray-100 font-bold outline-none">
+                                <option value="">Semua Kelas</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                            <button onClick={exportData} className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-bold shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-2">
+                                <i data-lucide="download"></i> Download Excel
+                            </button>
                         </div>
                     </div>
                 </div>
