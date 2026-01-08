@@ -234,7 +234,11 @@
             const [className, setClassName] = useState('');
             const [studentName, setStudentName] = useState('');
             const [isImporting, setIsImporting] = useState(false);
-            const filteredStudents = students.filter(s => s.classId === selectedClass);
+            
+            // Otomatis urutkan secara alfabetis A-Z
+            const filteredStudents = students
+                .filter(s => s.classId === selectedClass)
+                .sort((a, b) => a.name.localeCompare(b.name));
 
             const handleExcelImport = async (e) => {
                 const file = e.target.files[0];
@@ -249,18 +253,20 @@
                         const workbook = XLSX.read(binaryStr, { type: 'binary' });
                         const sheetName = workbook.SheetNames[0];
                         const sheet = workbook.Sheets[sheetName];
-                        const json = XLSX.utils.sheet_to_json(sheet);
+                        
+                        // Gunakan header: 1 untuk membaca data mentah baris demi baris (tanpa label kolom)
+                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                         
                         const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students');
                         
                         let count = 0;
                         for (const row of json) {
-                            // Mencari kolom Nama secara dinamis
-                            const name = row.Nama || row.nama || row.Name || row.name || row['Nama Siswa'] || '';
+                            // Ambil data dari kolom pertama (index 0)
+                            const name = row[0];
                             
-                            if (name) {
+                            if (name && String(name).trim() !== '') {
                                 await window.fbUtils.addDoc(col, { 
-                                    name: String(name), 
+                                    name: String(name).trim(), 
                                     classId: selectedClass,
                                     importedAt: new Date().toISOString()
                                 });
@@ -269,7 +275,7 @@
                         }
                     } catch (error) { 
                         console.error("Gagal impor:", error);
-                        alert("Gagal membaca file Excel. Pastikan terdapat kolom 'Nama'.");
+                        alert("Gagal membaca file Excel.");
                     } finally { 
                         setIsImporting(false); 
                         e.target.value = '';
@@ -318,7 +324,7 @@
                         </div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                             <h3 className="font-bold mb-2">Impor Excel (.xlsx)</h3>
-                            <p className="text-[10px] text-slate-500 mb-3">Pilih kelas dahulu. Gunakan kolom "Nama".</p>
+                            <p className="text-[10px] text-slate-500 mb-3">Pilih kelas dahulu. Sistem mengambil data dari kolom pertama (Baris 1 langsung isi Nama).</p>
                             <div className="relative">
                                 <input 
                                     type="file" 
@@ -341,7 +347,7 @@
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 rounded-tl-xl">No</th><th className="p-4">Nama</th><th className="p-4 text-right rounded-tr-xl">Aksi</th></tr></thead>
+                                <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 rounded-tl-xl">No</th><th className="p-4">Nama (A-Z)</th><th className="p-4 text-right rounded-tr-xl">Aksi</th></tr></thead>
                                 <tbody className="divide-y">
                                     {filteredStudents.length > 0 ? filteredStudents.map((s, idx) => (
                                         <tr key={s.id} className="hover:bg-slate-50 transition-colors">
@@ -368,7 +374,11 @@
 
         const ScoreInput = ({ classes, students, selectedClass, setSelectedClass, selectedSubject, setSelectedSubject, meetingName, setMeetingName, user, setActiveTab }) => {
             const [localScores, setLocalScores] = useState({});
-            const filteredStudents = students.filter(s => s.classId === selectedClass);
+            
+            // Otomatis urutkan secara alfabetis A-Z untuk mempermudah input nilai
+            const filteredStudents = students
+                .filter(s => s.classId === selectedClass)
+                .sort((a, b) => a.name.localeCompare(b.name));
             
             const saveAll = async () => {
                 if (!user || !selectedSubject || !meetingName || !selectedClass) {
@@ -431,7 +441,7 @@
                     
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
-                            <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 text-left">Nama Siswa</th><th className="p-4 text-center w-32">Kognitif</th><th className="p-4 text-center w-32">Psikomotor</th><th className="p-4 text-center w-32">Afektif</th></tr></thead>
+                            <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 text-left">Nama Siswa (A-Z)</th><th className="p-4 text-center w-32">Kognitif</th><th className="p-4 text-center w-32">Psikomotor</th><th className="p-4 text-center w-32">Afektif</th></tr></thead>
                             <tbody>
                                 {filteredStudents.map(s => (
                                     <tr key={s.id} className="border-b hover:bg-slate-50 transition-colors">
