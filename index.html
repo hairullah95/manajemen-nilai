@@ -12,9 +12,11 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfcfd; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfcfd; margin: 0; padding: 0; }
         .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(229, 231, 235, 0.5); }
         .sidebar-active { background: #2563eb; color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background-color: #e5e7eb; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -23,22 +25,27 @@
     <!-- Firebase SDK Setup -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, deleteDoc, updateDoc, where, getDocs } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+        // Konfigurasi Firebase dari User
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlXDVBSJryVlGwtZWYL_BNnh6-7R-SbXk",
+            authDomain: "jurnal-guru-f06df.firebaseapp.com",
+            projectId: "jurnal-guru-f06df",
+            storageBucket: "jurnal-guru-f06df.firebasestorage.app",
+            messagingSenderId: "782875410114",
+            appId: "1:782875410114:web:702b8b802901b71d16055b",
+            measurementId: "G-9LCGMFSPMM"
+        };
 
         async function initFirebase() {
             try {
-                // Pastikan konfigurasi tersedia
-                if (typeof __firebase_config === 'undefined') {
-                    throw new Error("Firebase config not found");
-                }
-
-                const firebaseConfig = JSON.parse(__firebase_config);
                 const app = initializeApp(firebaseConfig);
                 const auth = getAuth(app);
                 const db = getFirestore(app);
 
-                // Bridge global untuk React
+                // Bridge global untuk React agar bisa diakses di script type="text/babel"
                 window.fb = { 
                     auth, 
                     db, 
@@ -54,7 +61,6 @@
                         updateDoc, 
                         where, 
                         getDocs, 
-                        signInWithCustomToken, 
                         signInAnonymously 
                     } 
                 };
@@ -81,7 +87,9 @@
             const [students, setStudents] = useState([]);
             const [scores, setScores] = useState([]);
             const [loading, setLoading] = useState(true);
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'eraport-app';
+            
+            // App ID tetap untuk memisahkan data di Firestore
+            const appId = "eraport-pro-v1";
 
             useEffect(() => {
                 const handleFbReady = () => setFbReady(true);
@@ -92,8 +100,6 @@
 
                 window.addEventListener('firebase-ready', handleFbReady);
                 window.addEventListener('firebase-error', handleFbError);
-                
-                // Jika sudah ready sebelum listener terpasang
                 if (window.fb) setFbReady(true);
 
                 return () => {
@@ -107,21 +113,20 @@
 
                 const initAuth = async () => {
                     try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await window.fb.methods.signInWithCustomToken(window.fb.auth, __initial_auth_token);
-                        } else {
-                            await window.fb.methods.signInAnonymously(window.fb.auth);
-                        }
+                        // Menggunakan Anonymous Sign-in sebagai default agar user tidak perlu login manual
+                        await window.fb.methods.signInAnonymously(window.fb.auth);
                     } catch (err) {
                         console.error("Auth error:", err);
-                        setError("Gagal melakukan login otomatis.");
+                        setError("Koneksi gagal. Silakan periksa koneksi internet Anda.");
                     }
                 };
 
                 initAuth();
                 const unsubscribe = window.fb.methods.onAuthStateChanged(window.fb.auth, (u) => {
-                    setUser(u);
-                    setLoading(false);
+                    if (u) {
+                        setUser(u);
+                        setLoading(false);
+                    }
                 });
                 return () => unsubscribe();
             }, [fbReady]);
@@ -129,73 +134,93 @@
             useEffect(() => {
                 if (!user || !fbReady) return;
 
-                // Listener Firestore dengan proteksi error
+                // Listener Firestore dengan path yang sesuai aturan keamanan (Rule 1)
                 const unsubClasses = window.fb.methods.onSnapshot(
                     window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes'),
                     (snap) => setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error("Firestore Classes Error:", err)
+                    (err) => console.error("Firestore Error:", err)
                 );
                 const unsubStudents = window.fb.methods.onSnapshot(
                     window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students'),
                     (snap) => setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error("Firestore Students Error:", err)
+                    (err) => console.error("Firestore Error:", err)
                 );
                 const unsubScores = window.fb.methods.onSnapshot(
                     window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'),
                     (snap) => setScores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error("Firestore Scores Error:", err)
+                    (err) => console.error("Firestore Error:", err)
                 );
+                
                 return () => { unsubClasses(); unsubStudents(); unsubScores(); };
             }, [user, fbReady]);
 
             if (error) return (
-                <div className="h-screen flex flex-col items-center justify-center p-6 text-center">
+                <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-white">
                     <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
                         <i data-lucide="alert-circle" className="w-10 h-10"></i>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Terjadi Kesalahan</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Gagal Memuat</h2>
                     <p className="text-gray-500 max-w-md">{error}</p>
-                    <button onClick={() => window.location.reload()} className="mt-6 bg-blue-600 text-white px-6 py-2 rounded-xl font-bold">Coba Lagi</button>
+                    <button onClick={() => window.location.reload()} className="mt-6 bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg hover:bg-blue-700">Refresh Halaman</button>
                 </div>
             );
 
             if (loading) return (
-                <div className="h-screen flex flex-col items-center justify-center gap-4">
-                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-gray-500 font-medium tracking-wide">Menyiapkan Aplikasi...</p>
-                    <p className="text-[10px] text-gray-300">Menghubungkan ke server data...</p>
+                <div className="h-screen flex flex-col items-center justify-center gap-4 bg-white">
+                    <div className="w-14 h-14 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="text-center">
+                        <p className="text-gray-900 font-bold text-lg">E-Raport Pro</p>
+                        <p className="text-gray-400 text-sm animate-pulse">Menghubungkan ke Database...</p>
+                    </div>
                 </div>
             );
 
             return (
-                <div className="flex min-h-screen">
-                    <aside className="w-64 bg-white border-r border-gray-100 flex flex-col p-6 space-y-8">
-                        <div className="flex items-center gap-3 text-blue-600 font-bold text-xl">
-                            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">R</div>
-                            E-Raport
+                <div className="flex min-h-screen bg-[#fcfcfd]">
+                    {/* Sidebar */}
+                    <aside className="w-72 bg-white border-r border-gray-100 flex flex-col p-8 space-y-10">
+                        <div className="flex items-center gap-4 text-blue-600">
+                            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                                <i data-lucide="book-open" className="w-6 h-6"></i>
+                            </div>
+                            <span className="font-extrabold text-2xl tracking-tight text-gray-900">E-Raport</span>
                         </div>
-                        <nav className="flex-1 space-y-2">
+                        
+                        <nav className="flex-1 space-y-3">
                             {[
-                                { id: 'dashboard', label: 'Dashboard', icon: 'layout' },
-                                { id: 'manajemen', label: 'Input Data Siswa', icon: 'user-plus' },
+                                { id: 'dashboard', label: 'Ringkasan', icon: 'layout' },
+                                { id: 'manajemen', label: 'Data Siswa', icon: 'users' },
                                 { id: 'input', label: 'Input Nilai', icon: 'edit-3' },
-                                { id: 'ekspor', label: 'Ekspor Hasil', icon: 'download' }
+                                { id: 'ekspor', label: 'Ekspor Rekap', icon: 'file-text' }
                             ].map(item => (
-                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl font-medium transition-all ${activeTab === item.id ? 'sidebar-active' : 'text-gray-500 hover:bg-gray-50'}`}>
-                                    <i data-lucide={item.icon} className="w-5 h-5"></i> {item.label}
+                                <button 
+                                    key={item.id} 
+                                    onClick={() => setActiveTab(item.id)} 
+                                    className={`w-full flex items-center gap-4 p-4 rounded-2xl font-semibold transition-all duration-300 ${activeTab === item.id ? 'sidebar-active' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'}`}
+                                >
+                                    <i data-lucide={item.icon} className="w-5 h-5"></i>
+                                    {item.label}
                                 </button>
                             ))}
                         </nav>
-                        <div className="pt-6 border-t border-gray-100 text-xs text-gray-400">
-                            User ID: {user?.uid ? user.uid.substring(0, 8) + '...' : 'Guest'}
+
+                        <div className="p-5 bg-gray-50 rounded-2xl">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status Database</p>
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                                <span className="text-xs font-bold text-gray-700">Terhubung</span>
+                            </div>
                         </div>
                     </aside>
 
-                    <main className="flex-1 p-10 overflow-y-auto h-screen bg-gray-50/30">
-                        {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
-                        {activeTab === 'manajemen' && <ManajemenData classes={classes} students={students} user={user} appId={appId} />}
-                        {activeTab === 'input' && <InputNilai classes={classes} students={students} user={user} appId={appId} />}
-                        {activeTab === 'ekspor' && <EksporHasil classes={classes} students={students} scores={scores} />}
+                    {/* Main Content */}
+                    <main className="flex-1 overflow-y-auto h-screen custom-scroll">
+                        <div className="max-w-6xl mx-auto p-12">
+                            {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
+                            {activeTab === 'manajemen' && <ManajemenData classes={classes} students={students} user={user} appId={appId} />}
+                            {activeTab === 'input' && <InputNilai classes={classes} students={students} user={user} appId={appId} />}
+                            {activeTab === 'ekspor' && <EksporHasil classes={classes} students={students} scores={scores} />}
+                        </div>
                     </main>
                 </div>
             );
@@ -204,21 +229,59 @@
         const Dashboard = ({ classes, students, scores }) => {
             useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
             return (
-                <div className="space-y-8 animate-in fade-in">
-                    <h1 className="text-3xl font-extrabold text-gray-900">Ringkasan Sistem</h1>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="glass-card p-6 rounded-3xl flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><i data-lucide="grid"></i></div>
-                            <div><p className="text-gray-400 text-sm">Total Kelas</p><h2 className="text-2xl font-bold">{classes.length}</h2></div>
+                <div className="space-y-10 animate-in fade-in duration-500">
+                    <div>
+                        <h1 className="text-4xl font-black text-gray-900 tracking-tight">Selamat Datang, Guru!</h1>
+                        <p className="text-gray-400 mt-2 font-medium">Berikut adalah rangkuman data penilaian Anda hari ini.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="glass-card p-8 rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
+                            <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><i data-lucide="grid"></i></div>
+                            <div>
+                                <h2 className="text-4xl font-black text-gray-900">{classes.length}</h2>
+                                <p className="text-gray-400 font-bold text-sm uppercase tracking-widest">Total Kelas</p>
+                            </div>
                         </div>
-                        <div className="glass-card p-6 rounded-3xl flex items-center gap-4">
-                            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><i data-lucide="users"></i></div>
-                            <div><p className="text-gray-400 text-sm">Total Siswa</p><h2 className="text-2xl font-bold">{students.length}</h2></div>
+                        <div className="glass-card p-8 rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
+                            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><i data-lucide="users"></i></div>
+                            <div>
+                                <h2 className="text-4xl font-black text-gray-900">{students.length}</h2>
+                                <p className="text-gray-400 font-bold text-sm uppercase tracking-widest">Siswa Terdaftar</p>
+                            </div>
                         </div>
-                        <div className="glass-card p-6 rounded-3xl flex items-center gap-4">
-                            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><i data-lucide="database"></i></div>
-                            <div><p className="text-gray-400 text-sm">Total Penilaian</p><h2 className="text-2xl font-bold">{scores.length}</h2></div>
+                        <div className="glass-card p-8 rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
+                            <div className="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><i data-lucide="database"></i></div>
+                            <div>
+                                <h2 className="text-4xl font-black text-gray-900">{scores.length}</h2>
+                                <p className="text-gray-400 font-bold text-sm uppercase tracking-widest">Entri Nilai</p>
+                            </div>
                         </div>
+                    </div>
+
+                    <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><i data-lucide="info" className="w-5 h-5"></i></div>
+                            <h3 className="text-xl font-bold">Panduan Singkat</h3>
+                        </div>
+                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-500 font-medium">
+                            <li className="flex gap-3">
+                                <span className="text-blue-600 font-black">1.</span>
+                                Daftarkan kelas Anda terlebih dahulu di menu Data Siswa.
+                            </li>
+                            <li className="flex gap-3">
+                                <span className="text-blue-600 font-black">2.</span>
+                                Tambahkan siswa ke dalam kelas yang sudah dibuat.
+                            </li>
+                            <li className="flex gap-3">
+                                <span className="text-blue-600 font-black">3.</span>
+                                Gunakan menu Input Nilai untuk mencatat hasil belajar harian.
+                            </li>
+                            <li className="flex gap-3">
+                                <span className="text-blue-600 font-black">4.</span>
+                                Ekspor hasil nilai ke Excel untuk keperluan administrasi rapot.
+                            </li>
+                        </ul>
                     </div>
                 </div>
             );
@@ -238,7 +301,7 @@
             };
 
             const addStudent = async () => {
-                if (!studentName || !selectedClassId || !user) return alert('Lengkapi nama siswa dan pilih kelas!');
+                if (!studentName || !selectedClassId || !user) return;
                 await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students'), { 
                     name: studentName, 
                     classId: selectedClassId 
@@ -246,56 +309,66 @@
                 setStudentName('');
             };
 
-            return (
-                <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                    <h1 className="text-3xl font-extrabold text-gray-900">Input Data Siswa</h1>
+            const deleteItem = async (coll, id) => {
+                await window.fb.methods.deleteDoc(window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, coll, id));
+            };
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="glass-card p-8 rounded-[2rem] space-y-6 text-gray-800">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><i data-lucide="grid"></i></div>
-                                <h3 className="text-xl font-bold">Data Kelas</h3>
+            return (
+                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <h1 className="text-4xl font-black text-gray-900 tracking-tight">Manajemen Data</h1>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                        {/* Box Kelas */}
+                        <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm space-y-8">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-2xl font-bold">Daftar Kelas</h3>
+                                <div className="text-xs font-black px-3 py-1 bg-blue-100 text-blue-600 rounded-full">{classes.length} KELAS</div>
                             </div>
-                            <div className="flex gap-2">
-                                <input value={newClass} onChange={e => setNewClass(e.target.value)} className="flex-1 bg-white border border-gray-200 p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nama Kelas" />
-                                <button onClick={addClass} className="bg-blue-600 text-white px-6 rounded-xl font-bold hover:bg-blue-700 transition-all">Tambah</button>
+                            <div className="flex gap-3">
+                                <input value={newClass} onChange={e => setNewClass(e.target.value)} className="flex-1 bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-semibold" placeholder="Nama Kelas (Contoh: VII-A)" />
+                                <button onClick={addClass} className="bg-blue-600 text-white px-8 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100">Tambah</button>
                             </div>
-                            <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-2">
+                            <div className="space-y-2 max-h-80 overflow-y-auto custom-scroll pr-2">
                                 {classes.map(c => (
-                                    <div key={c.id} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center border border-transparent hover:border-blue-100 transition-all">
-                                        <span className="font-semibold">{c.name}</span>
-                                        <button onClick={() => window.fb.methods.deleteDoc(window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes', c.id))} className="text-gray-300 hover:text-red-500"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                                    <div key={c.id} className="group p-4 bg-gray-50/50 rounded-2xl flex justify-between items-center border border-transparent hover:border-blue-200 transition-all">
+                                        <span className="font-bold text-gray-700">{c.name}</span>
+                                        <button onClick={() => deleteItem('classes', c.id)} className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" className="w-5 h-5"></i></button>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="glass-card p-8 rounded-[2rem] space-y-6">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center"><i data-lucide="user-plus"></i></div>
-                                <h3 className="text-xl font-bold">Input Siswa Baru</h3>
-                            </div>
-                            <div className="space-y-3">
-                                <input value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full bg-white border border-gray-200 p-4 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Nama Lengkap Siswa" />
-                                <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full bg-white border border-gray-200 p-4 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
-                                    <option value="">Pilih Kelas Siswa...</option>
-                                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
-                                <button onClick={addStudent} className="w-full bg-emerald-600 text-white p-4 rounded-xl font-bold hover:bg-emerald-700 transition-all">Simpan Data Siswa</button>
+                        {/* Box Input Siswa */}
+                        <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm space-y-8">
+                            <h3 className="text-2xl font-bold">Input Siswa Baru</h3>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Nama Lengkap</label>
+                                    <input value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold" placeholder="Masukkan nama siswa..." />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Pilih Kelas</label>
+                                    <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold appearance-none">
+                                        <option value="">-- Pilih Kelas --</option>
+                                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                <button onClick={addStudent} className="w-full bg-emerald-600 text-white p-5 rounded-2xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">Simpan Data Siswa</button>
                             </div>
                         </div>
                     </div>
 
-                    <div className="glass-card p-8 rounded-[2.5rem] space-y-6">
-                        <h3 className="text-xl font-bold">Daftar Seluruh Siswa ({students.length})</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Tabel Siswa */}
+                    <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm space-y-8">
+                        <h3 className="text-2xl font-bold">Daftar Seluruh Siswa</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             {students.map(s => (
-                                <div key={s.id} className="p-4 bg-white border border-gray-100 rounded-2xl flex justify-between items-center shadow-sm">
+                                <div key={s.id} className="p-5 bg-white border border-gray-100 rounded-[1.5rem] flex justify-between items-center group shadow-sm">
                                     <div className="overflow-hidden">
                                         <p className="font-bold text-gray-800 truncate">{s.name}</p>
-                                        <p className="text-[10px] text-blue-600 font-black uppercase tracking-tighter">{classes.find(c => c.id === s.classId)?.name || 'Tanpa Kelas'}</p>
+                                        <p className="text-[10px] text-blue-600 font-black uppercase tracking-tighter">{classes.find(c => c.id === s.classId)?.name || 'N/A'}</p>
                                     </div>
-                                    <button onClick={() => window.fb.methods.deleteDoc(window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students', s.id))} className="text-gray-300 hover:text-red-500 p-2"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                                    <button onClick={() => deleteItem('students', s.id)} className="text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><i data-lucide="x-circle" className="w-5 h-5"></i></button>
                                 </div>
                             ))}
                         </div>
@@ -325,70 +398,89 @@
             };
 
             const saveAll = async () => {
-                if (!selClass || !selSubject || !meetingName || !user) return alert('Lengkapi data!');
-                for (const studentId of Object.keys(inputData)) {
-                    await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), {
-                        studentId, classId: selClass, subject: selSubject, meeting: meetingName,
-                        kog: inputData[studentId], psi: inputData[studentId], afe: inputData[studentId],
-                        timestamp: new Date().toISOString()
-                    });
+                if (!selClass || !selSubject || !meetingName || !user) return alert('Mohon lengkapi Kelas, Mapel, dan Nama Pertemuan!');
+                const confirmSave = confirm(`Simpan nilai untuk ${Object.keys(inputData).length} siswa?`);
+                if (!confirmSave) return;
+
+                try {
+                    for (const studentId of Object.keys(inputData)) {
+                        await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), {
+                            studentId, 
+                            classId: selClass, 
+                            subject: selSubject, 
+                            meeting: meetingName,
+                            kog: inputData[studentId],
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                    alert('Nilai berhasil disimpan ke database!');
+                    setBulkVal('');
+                    setInputData({});
+                } catch (e) {
+                    alert('Gagal menyimpan data.');
                 }
-                alert('Berhasil menyimpan nilai!');
-                setBulkVal('');
-                setInputData({});
             };
 
             return (
-                <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                    <h1 className="text-3xl font-extrabold text-gray-900">Input Nilai Pertemuan</h1>
+                <div className="space-y-10 animate-in slide-in-from-bottom-4">
+                    <h1 className="text-4xl font-black text-gray-900 tracking-tight">Penilaian Harian</h1>
                     
-                    <div className="glass-card p-8 rounded-[2rem] grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Pilih Kelas</label>
-                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="w-full bg-gray-50 border-none p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold">
-                                <option value="">Pilih...</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Pilih Kelas</label>
+                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold appearance-none">
+                                <option value="">Pilih...</option>
+                                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Mata Pelajaran</label>
-                            <input value={selSubject} onChange={e => setSelSubject(e.target.value)} placeholder="Matematika" className="w-full bg-gray-50 border-none p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Mata Pelajaran</label>
+                            <input value={selSubject} onChange={e => setSelSubject(e.target.value)} placeholder="Contoh: Matematika" className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tipe Pertemuan</label>
-                            <input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="Misal: UH 1" className="w-full bg-gray-50 border-none p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Pertemuan / Tugas</label>
+                            <input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="Contoh: PH 1 / Tugas 2" className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
                         </div>
                     </div>
 
                     {selClass && (
-                        <div className="glass-card rounded-[2rem] overflow-hidden shadow-xl">
-                            <table className="w-full text-left">
-                                <thead className="bg-gray-900 text-white">
-                                    <tr>
-                                        <th className="p-5 font-bold text-sm">Nama Siswa</th>
-                                        <th className="p-5 font-bold text-sm w-48 text-center">Input Nilai</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    <tr className="bg-blue-50/30">
-                                        <td className="p-5 font-black text-blue-600 text-[10px] italic flex items-center gap-2">
-                                            <i data-lucide="zap" className="w-3 h-3"></i> INPUT MASSAL
-                                        </td>
-                                        <td className="p-5">
-                                            <input value={bulkVal} onChange={e => handleBulk(e.target.value)} type="number" className="w-full p-3 rounded-lg border-2 border-blue-300 text-center font-bold" placeholder="Set semua..." />
-                                        </td>
-                                    </tr>
-                                    {filteredStudents.map(s => (
-                                        <tr key={s.id}>
-                                            <td className="p-5 font-bold text-gray-700">{s.name}</td>
-                                            <td className="p-5">
-                                                <input value={inputData[s.id] || ''} onChange={e => setInputData({...inputData, [s.id]: parseFloat(e.target.value)||0})} type="number" className="w-full p-3 rounded-lg border border-gray-200 text-center font-bold focus:border-blue-500 outline-none" placeholder="0" />
-                                            </td>
+                        <div className="glass-card rounded-[3rem] overflow-hidden border-none shadow-lg">
+                            <div className="bg-gray-900 p-8 flex justify-between items-center">
+                                <h4 className="text-white font-bold text-xl">Daftar Penilaian Siswa</h4>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Set Semua:</span>
+                                    <input value={bulkVal} onChange={e => handleBulk(e.target.value)} type="number" className="w-24 bg-white/10 border border-white/20 p-2 rounded-lg text-white text-center font-bold outline-none focus:border-blue-400" placeholder="0" />
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="p-6 font-black text-xs text-gray-400 uppercase tracking-widest">Nama Siswa</th>
+                                            <th className="p-6 font-black text-xs text-gray-400 uppercase tracking-widest text-center">Nilai Angka</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                            <div className="p-8 bg-gray-50/50">
-                                <button onClick={saveAll} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3">
-                                    <i data-lucide="save"></i> Simpan Nilai
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {filteredStudents.map(s => (
+                                            <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="p-6 font-bold text-gray-700">{s.name}</td>
+                                                <td className="p-6 text-center">
+                                                    <input 
+                                                        value={inputData[s.id] || ''} 
+                                                        onChange={e => setInputData({...inputData, [s.id]: parseFloat(e.target.value)||0})} 
+                                                        type="number" 
+                                                        className="w-32 p-4 rounded-2xl border-2 border-gray-100 text-center font-black text-xl focus:border-blue-500 outline-none transition-all" 
+                                                        placeholder="0" 
+                                                    />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="p-10 bg-gray-50/50">
+                                <button onClick={saveAll} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black text-lg shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-4">
+                                    <i data-lucide="save"></i> SIMPAN SEMUA NILAI KE DATABASE
                                 </button>
                             </div>
                         </div>
@@ -402,36 +494,45 @@
 
             useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
-            const exportData = () => {
+            const exportToExcel = () => {
                 const meetingTypes = Array.from(new Set(scores.map(s => s.meeting)));
                 const rows = students
                     .filter(s => !selClass || s.classId === selClass)
                     .map(student => {
                         const res = { "Nama Siswa": student.name };
                         meetingTypes.forEach(type => {
-                            const score = scores.find(sc => sc.studentId === student.id && sc.meeting === type);
-                            res[type] = score ? score.kog : "-";
+                            const scoreEntries = scores.filter(sc => sc.studentId === student.id && sc.meeting === type);
+                            // Jika ada beberapa nilai untuk tipe yang sama, ambil yang terbaru
+                            const latestScore = scoreEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+                            res[type] = latestScore ? latestScore.kog : "-";
                         });
                         return res;
                     });
                 
-                if (rows.length === 0) return alert('Tidak ada data!');
+                if (rows.length === 0) return alert('Tidak ada data yang bisa diekspor.');
 
                 const ws = XLSX.utils.json_to_sheet(rows);
                 const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Rekap");
-                XLSX.writeFile(wb, "Rekap_Nilai.xlsx");
+                XLSX.utils.book_append_sheet(wb, ws, "Rekap_Nilai");
+                XLSX.writeFile(wb, `Rekap_Nilai_${selClass || 'Semua'}.xlsx`);
             };
 
             return (
-                <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                    <div className="glass-card p-10 rounded-[2.5rem] text-center space-y-6">
-                        <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner"><i data-lucide="file-spreadsheet" className="w-10 h-10"></i></div>
-                        <h2 className="text-2xl font-black">Ekspor Hasil Nilai</h2>
-                        <div className="flex flex-col items-center gap-4 pt-4">
-                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="w-full max-w-xs bg-gray-50 p-4 rounded-xl border border-gray-100 font-bold">
-                                <option value="">Semua Kelas</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-                            <button onClick={exportData} className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-bold shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-3">
+                <div className="space-y-10 animate-in slide-in-from-bottom-4">
+                    <div className="glass-card p-16 rounded-[4rem] text-center space-y-10 border-none shadow-sm">
+                        <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner">
+                            <i data-lucide="file-spreadsheet" className="w-12 h-12"></i>
+                        </div>
+                        <div className="space-y-4">
+                            <h2 className="text-4xl font-black text-gray-900 tracking-tight">Ekspor Data Nilai</h2>
+                            <p className="text-gray-400 font-medium max-w-md mx-auto">Klik tombol di bawah untuk mengunduh rekapitulasi nilai seluruh siswa dalam format Excel (.xlsx)</p>
+                        </div>
+                        <div className="flex flex-col items-center gap-6 max-w-sm mx-auto">
+                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="w-full bg-gray-50 p-5 rounded-2xl border-none font-bold text-center appearance-none outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="">Semua Kelas</option>
+                                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                            <button onClick={exportToExcel} className="w-full bg-emerald-600 text-white p-6 rounded-[2rem] font-extrabold text-xl shadow-2xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-4">
                                 <i data-lucide="download"></i> Download Excel
                             </button>
                         </div>
