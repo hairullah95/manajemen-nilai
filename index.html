@@ -15,6 +15,9 @@
         body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -47,14 +50,11 @@
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
         const Icon = ({ name, size = 20, className = "" }) => {
-            const iconRef = useRef(null);
             useEffect(() => {
-                try {
-                    if (window.lucide) window.lucide.createIcons();
-                } catch (e) {}
+                if (window.lucide) window.lucide.createIcons();
             }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
         };
@@ -76,97 +76,47 @@
                 const unsubscribe = window.fbUtils.onAuthStateChanged(window.fbAuth, (currentUser) => {
                     setUser(currentUser);
                     setAuthLoading(false);
-                    if (currentUser) setActiveTab('dashboard');
                 });
                 return () => unsubscribe();
             }, []);
 
             useEffect(() => {
-                if (!user) {
-                    setClasses([]);
-                    setStudents([]);
-                    setScores([]);
-                    return;
-                }
-
+                if (!user) return;
                 const appId = 'manajemen-nilai-siswa';
                 const userId = user.uid;
 
-                const qClasses = window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'classes');
-                const qStudents = window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'students');
-                const qScores = window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'scores');
-
-                const unsubClasses = window.fbUtils.onSnapshot(qClasses, (snap) => {
+                const unsubClasses = window.fbUtils.onSnapshot(window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'classes'), (snap) => {
                     setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 });
-
-                const unsubStudents = window.fbUtils.onSnapshot(qStudents, (snap) => {
+                const unsubStudents = window.fbUtils.onSnapshot(window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'students'), (snap) => {
                     setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 });
-
-                const unsubScores = window.fbUtils.onSnapshot(qScores, (snap) => {
+                const unsubScores = window.fbUtils.onSnapshot(window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', userId, 'scores'), (snap) => {
                     setScores(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 });
 
-                return () => {
-                    unsubClasses();
-                    unsubStudents();
-                    unsubScores();
-                };
+                return () => { unsubClasses(); unsubStudents(); unsubScores(); };
             }, [user]);
 
-            const handleLogin = async () => {
-                setAuthLoading(true);
-                try {
-                    await window.fbUtils.signInWithPopup(window.fbAuth, window.fbProvider);
-                } catch (error) {
-                    console.error("Login Error:", error);
-                    setAuthLoading(false);
-                }
-            };
+            const handleLogout = () => window.fbUtils.signOut(window.fbAuth);
 
-            const handleLogout = () => {
-                window.fbUtils.signOut(window.fbAuth).then(() => {
-                    setUser(null);
-                    setActiveTab('dashboard');
-                });
-            };
+            if (authLoading) return <div className="h-screen flex items-center justify-center bg-white"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
 
-            if (authLoading) {
-                return (
-                    <div className="h-screen w-screen flex flex-col items-center justify-center bg-white">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                        <p className="text-slate-500 font-medium">Memverifikasi Sesi...</p>
+            if (!user) return (
+                <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+                    <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10 text-center space-y-6">
+                        <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg"><Icon name="book-open" size={40} className="text-white"/></div>
+                        <h1 className="text-3xl font-black text-slate-800">E-Raport</h1>
+                        <button onClick={() => window.fbUtils.signInWithPopup(window.fbAuth, window.fbProvider)} className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 py-4 rounded-2xl font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google"/> Masuk dengan Google
+                        </button>
                     </div>
-                );
-            }
-
-            if (!user) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 fade-in">
-                        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10 text-center space-y-6">
-                            <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-blue-200">
-                                <Icon name="book-open" size={40} className="text-white"/>
-                            </div>
-                            <div className="space-y-2">
-                                <h1 className="text-3xl font-black text-slate-800 tracking-tight">E-Raport</h1>
-                                <p className="text-slate-500">Masuk untuk mengelola nilai siswa Anda</p>
-                            </div>
-                            <button 
-                                onClick={handleLogin}
-                                className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 py-4 rounded-2xl font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
-                            >
-                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google"/>
-                                Masuk dengan Google
-                            </button>
-                        </div>
-                    </div>
-                );
-            }
+                </div>
+            );
 
             return (
-                <div className="min-h-screen bg-slate-50 flex fade-in">
-                    <div className="w-64 bg-slate-900 text-white h-screen sticky top-0 p-4 flex flex-col shrink-0">
+                <div className="min-h-screen bg-slate-50 flex">
+                    <aside className="w-64 bg-slate-900 text-white h-screen sticky top-0 p-4 flex flex-col shrink-0 shadow-2xl z-20">
                         <div className="text-2xl font-bold flex items-center gap-2 mb-10 px-2">
                             <div className="p-2 bg-blue-600 rounded-lg"><Icon name="book-open" size={24} /></div>
                             <span>E-Raport</span>
@@ -178,33 +128,24 @@
                                 { id: 'input-nilai', label: 'Input Nilai', icon: 'clipboard-check' },
                                 { id: 'rekap', label: 'Rekap Nilai', icon: 'file-text' }
                             ].map((item) => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => setActiveTab(item.id)}
-                                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${
-                                        activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'
-                                    }`}
-                                >
-                                    <Icon name={item.icon} size={20} />
-                                    <span className="font-medium">{item.label}</span>
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}>
+                                    <Icon name={item.icon} size={20} /> <span className="font-medium">{item.label}</span>
                                 </button>
                             ))}
                         </nav>
                         <div className="pt-4 border-t border-slate-800">
                             <div className="flex items-center gap-3 p-2 mb-4 overflow-hidden">
-                                <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-blue-500" alt="Avatar"/>
-                                <div className="truncate">
-                                    <p className="text-sm font-bold truncate">{user.displayName || 'User'}</p>
-                                </div>
+                                <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-blue-500" />
+                                <div className="truncate"><p className="text-sm font-bold truncate">{user.displayName}</p></div>
                             </div>
-                            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors font-bold text-sm">
+                            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-bold text-sm">
                                 <Icon name="log-out" size={18} /> Keluar
                             </button>
                         </div>
-                    </div>
+                    </aside>
 
-                    <main className="flex-1 p-8 overflow-y-auto">
-                        {activeTab === 'dashboard' && <DashboardStats classes={classes} students={students} scores={scores} />}
+                    <main className="flex-1 p-8 overflow-y-auto max-w-7xl mx-auto w-full">
+                        {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
                         {activeTab === 'data-siswa' && <StudentManager classes={classes} students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} user={user} />}
                         {activeTab === 'input-nilai' && <ScoreInput classes={classes} students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} selectedSubject={selectedSubject} setSelectedSubject={setSelectedSubject} meetingName={meetingName} setMeetingName={setMeetingName} user={user} setActiveTab={setActiveTab} />}
                         {activeTab === 'rekap' && <ReportSummary scores={scores} students={students} classes={classes} />}
@@ -213,143 +154,155 @@
             );
         };
 
-        const DashboardStats = ({ classes, students, scores }) => (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-                    <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl"><Icon name="grid" size={28}/></div>
-                    <div><p className="text-slate-500 text-sm font-medium">Total Kelas</p><h3 className="text-2xl font-bold">{classes.length}</h3></div>
+        const Dashboard = ({ classes, students, scores }) => {
+            const studentAverages = useMemo(() => {
+                return students.map(student => {
+                    const studentScores = scores.filter(s => s.studentId === student.id);
+                    if (studentScores.length === 0) return { ...student, avg: 0, count: 0 };
+                    
+                    const totalFinal = studentScores.reduce((acc, curr) => {
+                        return acc + (curr.kog * 0.4 + curr.psi * 0.3 + curr.afe * 0.3);
+                    }, 0);
+                    
+                    return { ...student, avg: (totalFinal / studentScores.length).toFixed(2), count: studentScores.length };
+                }).sort((a, b) => b.avg - a.avg);
+            }, [students, scores]);
+
+            return (
+                <div className="space-y-8 fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                            <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl"><Icon name="grid" size={28}/></div>
+                            <div><p className="text-slate-500 text-sm font-medium">Total Kelas</p><h3 className="text-2xl font-bold">{classes.length}</h3></div>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                            <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon name="users" size={28}/></div>
+                            <div><p className="text-slate-500 text-sm font-medium">Siswa</p><h3 className="text-2xl font-bold">{students.length}</h3></div>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                            <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl"><Icon name="check-square" size={28}/></div>
+                            <div><p className="text-slate-500 text-sm font-medium">Data Nilai</p><h3 className="text-2xl font-bold">{scores.length}</h3></div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-black text-slate-800 text-xl">Rata-rata Nilai Siswa (Keseluruhan)</h3>
+                            <Icon name="trending-up" className="text-blue-500" />
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[11px] tracking-wider">
+                                    <tr>
+                                        <th className="p-4 text-left">Peringkat</th>
+                                        <th className="p-4 text-left">Nama Siswa</th>
+                                        <th className="p-4 text-center">Jumlah Tes</th>
+                                        <th className="p-4 text-right">Rata-rata Nilai Akhir</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {studentAverages.slice(0, 10).map((s, idx) => (
+                                        <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-4">
+                                                <span className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-xs ${idx < 3 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                    {idx + 1}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 font-bold text-slate-700">{s.name}</td>
+                                            <td className="p-4 text-center text-slate-500 font-medium">{s.count} kali</td>
+                                            <td className="p-4 text-right">
+                                                <span className={`px-3 py-1 rounded-full font-black text-sm ${s.avg >= 75 ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
+                                                    {s.avg}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {studentAverages.length === 0 && <tr><td colSpan="4" className="p-10 text-center text-slate-400 italic">Belum ada data nilai untuk dihitung.</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-                    <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon name="users" size={28}/></div>
-                    <div><p className="text-slate-500 text-sm font-medium">Siswa Terdaftar</p><h3 className="text-2xl font-bold">{students.length}</h3></div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-                    <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl"><Icon name="check-square" size={28}/></div>
-                    <div><p className="text-slate-500 text-sm font-medium">Entri Nilai</p><h3 className="text-2xl font-bold">{scores.length}</h3></div>
-                </div>
-            </div>
-        );
+            );
+        };
 
         const StudentManager = ({ classes, students, selectedClass, setSelectedClass, user }) => {
             const [className, setClassName] = useState('');
             const [studentName, setStudentName] = useState('');
             const [isImporting, setIsImporting] = useState(false);
             
-            const filteredStudents = students
-                .filter(s => s.classId === selectedClass)
-                .sort((a, b) => a.name.localeCompare(b.name));
+            const filteredStudents = students.filter(s => s.classId === selectedClass).sort((a, b) => a.name.localeCompare(b.name));
 
             const handleExcelImport = async (e) => {
                 const file = e.target.files[0];
-                if (!file || !selectedClass || !user) return;
-                
+                if (!file || !selectedClass) return;
                 setIsImporting(true);
                 const reader = new FileReader();
-                
                 reader.onload = async (evt) => {
-                    try {
-                        const binaryStr = evt.target.result;
-                        const workbook = XLSX.read(binaryStr, { type: 'binary' });
-                        const sheetName = workbook.SheetNames[0];
-                        const sheet = workbook.Sheets[sheetName];
-                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                        const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students');
-                        
-                        for (const row of json) {
-                            const name = row[0];
-                            if (name && String(name).trim() !== '') {
-                                await window.fbUtils.addDoc(col, { 
-                                    name: String(name).trim(), 
-                                    classId: selectedClass,
-                                    importedAt: new Date().toISOString()
-                                });
-                            }
+                    const workbook = XLSX.read(evt.target.result, { type: 'binary' });
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                    const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students');
+                    for (const row of json) {
+                        const name = row[0];
+                        if (name && String(name).trim() !== '') {
+                            await window.fbUtils.addDoc(col, { name: String(name).trim(), classId: selectedClass });
                         }
-                    } catch (error) { 
-                        console.error("Gagal impor:", error);
-                        alert("Gagal membaca file Excel.");
-                    } finally { 
-                        setIsImporting(false); 
-                        e.target.value = '';
                     }
+                    setIsImporting(false);
+                    e.target.value = '';
                 };
                 reader.readAsBinaryString(file);
-            };
-
-            const addClass = async () => {
-                if (!className || !user) return;
-                const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'classes');
-                await window.fbUtils.addDoc(col, { name: className, createdAt: new Date().toISOString() });
-                setClassName('');
-            };
-
-            const addStudent = async () => {
-                if (!studentName || !selectedClass || !user) return;
-                const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students');
-                await window.fbUtils.addDoc(col, { name: studentName, classId: selectedClass });
-                setStudentName('');
             };
 
             return (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 fade-in">
                     <div className="space-y-6">
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                            <h3 className="font-bold mb-4 flex items-center gap-2">Kelola Kelas</h3>
+                            <h3 className="font-bold mb-4">Kelola Kelas</h3>
                             <div className="flex gap-2">
-                                <input value={className} onChange={e => setClassName(e.target.value)} placeholder="Nama Kelas" className="flex-1 border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
-                                <button onClick={addClass} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"><Icon name="plus"/></button>
+                                <input value={className} onChange={e => setClassName(e.target.value)} placeholder="Nama Kelas" className="flex-1 border p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"/>
+                                <button onClick={async () => {
+                                    if(!className) return;
+                                    await window.fbUtils.addDoc(window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'classes'), { name: className });
+                                    setClassName('');
+                                }} className="bg-blue-600 text-white p-2 rounded-lg"><Icon name="plus"/></button>
                             </div>
                             <div className="mt-4 space-y-1">
                                 {classes.map(c => (
-                                    <div key={c.id} onClick={() => setSelectedClass(c.id)} className={`p-3 rounded-lg cursor-pointer flex justify-between items-center transition-all ${selectedClass === c.id ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600' : 'hover:bg-slate-50'}`}>
-                                        <span className="font-medium">{c.name}</span>
-                                        {selectedClass === c.id && <Icon name="check" size={16} />}
+                                    <div key={c.id} onClick={() => setSelectedClass(c.id)} className={`p-3 rounded-lg cursor-pointer flex justify-between items-center transition-all ${selectedClass === c.id ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-bold' : 'hover:bg-slate-50 text-slate-500'}`}>
+                                        <span>{c.name}</span> {selectedClass === c.id && <Icon name="check" size={16} />}
                                     </div>
                                 ))}
                             </div>
                         </div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                            <h3 className="font-bold mb-2">Impor Excel (.xlsx)</h3>
-                            <p className="text-[10px] text-slate-500 mb-3">Pilih kelas dahulu. Baris 1 langsung isi Nama.</p>
-                            <div className="relative">
-                                <input 
-                                    type="file" 
-                                    accept=".xlsx, .xls" 
-                                    disabled={!selectedClass || isImporting} 
-                                    onChange={handleExcelImport} 
-                                    className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                />
-                            </div>
-                            {isImporting && <div className="mt-3 flex items-center gap-2 text-blue-600 text-xs font-medium animate-pulse"><Icon name="loader" size={14} className="animate-spin" /> Sedang mengimpor...</div>}
+                            <h3 className="font-bold mb-2 text-sm">Impor Siswa (.xlsx)</h3>
+                            <input type="file" disabled={!selectedClass} onChange={handleExcelImport} className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                            {isImporting && <p className="mt-2 text-blue-600 animate-pulse text-xs font-bold italic">Sedang mengimpor...</p>}
                         </div>
                     </div>
                     <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold">Daftar Siswa {selectedClass && `(${classes.find(c => c.id === selectedClass)?.name})`}</h3>
+                            <h3 className="font-black">Daftar Siswa {selectedClass && `(${classes.find(c => c.id === selectedClass)?.name})`}</h3>
                             <div className="flex gap-2">
-                                <input value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="Nama Lengkap" className="border p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 flex-1"/>
-                                <button onClick={addStudent} disabled={!selectedClass} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50">Tambah</button>
+                                <input value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="Nama Siswa" className="border p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"/>
+                                <button onClick={async () => {
+                                    if(!studentName || !selectedClass) return;
+                                    await window.fbUtils.addDoc(window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students'), { name: studentName, classId: selectedClass });
+                                    setStudentName('');
+                                }} disabled={!selectedClass} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50">Tambah</button>
                             </div>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 rounded-tl-xl">No</th><th className="p-4">Nama (A-Z)</th><th className="p-4 text-right rounded-tr-xl">Aksi</th></tr></thead>
+                                <thead className="bg-slate-50 text-slate-500"><tr><th className="p-4">No</th><th className="p-4">Nama (A-Z)</th><th className="p-4 text-right">Aksi</th></tr></thead>
                                 <tbody className="divide-y">
-                                    {filteredStudents.length > 0 ? filteredStudents.map((s, idx) => (
-                                        <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4 text-slate-400 font-mono w-16">{idx + 1}</td>
-                                            <td className="p-4 font-semibold text-slate-700">{s.name}</td>
-                                            <td className="p-4 text-right">
-                                                <button onClick={async () => {
-                                                    if(confirm('Hapus siswa ini?')) {
-                                                        await window.fbUtils.deleteDoc(window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students', s.id))
-                                                    }
-                                                }} className="text-red-400 hover:text-red-600 p-2"><Icon name="trash-2" size={18} /></button>
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr><td colSpan="3" className="p-10 text-center text-slate-400 italic">Belum ada data siswa di kelas ini.</td></tr>
-                                    )}
+                                    {filteredStudents.map((s, idx) => (
+                                        <tr key={s.id} className="hover:bg-slate-50"><td className="p-4 text-slate-400 font-mono">{idx + 1}</td><td className="p-4 font-bold text-slate-700">{s.name}</td><td className="p-4 text-right">
+                                            <button onClick={() => confirm('Hapus siswa?') && window.fbUtils.deleteDoc(window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students', s.id))} className="text-red-400 hover:text-red-600"><Icon name="trash-2" size={18} /></button>
+                                        </td></tr>
+                                    ))}
+                                    {filteredStudents.length === 0 && <tr><td colSpan="3" className="p-10 text-center text-slate-400 italic">Pilih kelas atau tambahkan siswa.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -360,143 +313,123 @@
 
         const ScoreInput = ({ classes, students, selectedClass, setSelectedClass, selectedSubject, setSelectedSubject, meetingName, setMeetingName, user, setActiveTab }) => {
             const [localScores, setLocalScores] = useState({});
+            const filteredStudents = students.filter(s => s.classId === selectedClass).sort((a, b) => a.name.localeCompare(b.name));
             
-            const filteredStudents = students
-                .filter(s => s.classId === selectedClass)
-                .sort((a, b) => a.name.localeCompare(b.name));
-            
-            const saveAll = async () => {
-                if (!user || !selectedSubject || !meetingName || !selectedClass) {
-                    alert("Mohon lengkapi Kelas, Mata Pelajaran, dan Nama Pertemuan");
-                    return;
-                }
+            const save = async () => {
+                if (!selectedSubject || !meetingName || !selectedClass) return alert("Lengkapi data!");
+                const entries = Object.values(localScores);
+                if (entries.length === 0) return alert("Input nilai dahulu!");
                 const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'scores');
-                
-                try {
-                    const entries = Object.values(localScores);
-                    if (entries.length === 0) {
-                        alert("Tidak ada nilai yang diinput");
-                        return;
-                    }
-
-                    await Promise.all(entries.map(score => 
-                        window.fbUtils.addDoc(col, { 
-                            ...score, 
-                            subject: selectedSubject, 
-                            meeting: meetingName, 
-                            classId: selectedClass, 
-                            timestamp: new Date().toISOString() 
-                        })
-                    ));
-                    
-                    alert("Berhasil menyimpan nilai!");
-                    setActiveTab('rekap');
-                } catch (err) {
-                    console.error(err);
-                    alert("Gagal menyimpan data.");
-                }
-            };
-
-            const updateLocal = (studentId, field, val) => {
-                setLocalScores(prev => ({
-                    ...prev,
-                    [studentId]: {
-                        ...(prev[studentId] || { studentId, kog: 0, psi: 0, afe: 0 }),
-                        [field]: parseFloat(val) || 0
-                    }
-                }));
+                await Promise.all(entries.map(s => window.fbUtils.addDoc(col, { ...s, subject: selectedSubject, meeting: meetingName, classId: selectedClass, timestamp: new Date().toISOString() })));
+                alert("Berhasil!"); setActiveTab('rekap');
             };
 
             return (
-                <div className="bg-white p-8 rounded-2xl shadow-sm fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                        <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Kelas</label>
-                            <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"><option value="">Pilih Kelas</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Mata Pelajaran</label>
-                            <input value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} placeholder="Contoh: Matematika" className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"/>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Tipe Penilaian</label>
-                            <input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="Contoh: UH 1 / PAS" className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"/>
-                        </div>
+                <div className="bg-white p-8 rounded-2xl shadow-sm fade-in space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div><label className="text-xs font-black text-slate-400 uppercase mb-2 block">Kelas</label><select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"><option value="">Pilih Kelas</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                        <div><label className="text-xs font-black text-slate-400 uppercase mb-2 block">Mata Pelajaran</label><input value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} placeholder="Matematika" className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                        <div><label className="text-xs font-black text-slate-400 uppercase mb-2 block">Tipe Penilaian</label><input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="UH 1 / UTS" className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"/></div>
                     </div>
-                    
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto rounded-xl border border-slate-100">
                         <table className="w-full text-sm">
-                            <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 text-left">Nama Siswa (A-Z)</th><th className="p-4 text-center w-32">Kognitif</th><th className="p-4 text-center w-32">Psikomotor</th><th className="p-4 text-center w-32">Afektif</th></tr></thead>
-                            <tbody>
+                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px]"><tr><th className="p-4 text-left">Siswa (A-Z)</th><th className="p-4 text-center w-32">Kognitif (40%)</th><th className="p-4 text-center w-32">Psiko (30%)</th><th className="p-4 text-center w-32">Afektif (30%)</th></tr></thead>
+                            <tbody className="divide-y">
                                 {filteredStudents.map(s => (
-                                    <tr key={s.id} className="border-b hover:bg-slate-50 transition-colors">
-                                        <td className="p-4 font-medium text-slate-700">{s.name}</td>
-                                        <td className="p-4 text-center"><input type="number" onChange={e => updateLocal(s.id, 'kog', e.target.value)} className="w-full border p-2 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0"/></td>
-                                        <td className="p-4 text-center"><input type="number" onChange={e => updateLocal(s.id, 'psi', e.target.value)} className="w-full border p-2 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0"/></td>
-                                        <td className="p-4 text-center"><input type="number" onChange={e => updateLocal(s.id, 'afe', e.target.value)} className="w-full border p-2 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0"/></td>
-                                    </tr>
+                                    <tr key={s.id} className="hover:bg-slate-50"><td className="p-4 font-bold text-slate-700">{s.name}</td><td className="p-4"><input type="number" onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), kog:parseFloat(e.target.value)||0}}))} className="w-full border p-2 rounded-lg text-center" /></td><td className="p-4"><input type="number" onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), psi:parseFloat(e.target.value)||0}}))} className="w-full border p-2 rounded-lg text-center" /></td><td className="p-4"><input type="number" onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), afe:parseFloat(e.target.value)||0}}))} className="w-full border p-2 rounded-lg text-center" /></td></tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-                    <button onClick={saveAll} className="mt-8 bg-blue-600 text-white px-8 py-4 rounded-xl font-black w-full shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
-                        <Icon name="save" /> Simpan Semua Nilai
-                    </button>
+                    <button onClick={save} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"><Icon name="save" /> Simpan Nilai</button>
                 </div>
             );
         };
 
         const ReportSummary = ({ scores, students, classes }) => {
-            const [filter, setFilter] = useState('');
+            const [filterClass, setFilterClass] = useState('');
+            const [filterType, setFilterType] = useState('riwayat'); // 'riwayat' atau 'tipe'
+            const [selectedMeetingType, setSelectedMeetingType] = useState('');
 
-            // Fungsi hitung nilai akhir
-            const calculateFinal = (s) => {
-                const final = (s.kog * 0.4) + (s.psi * 0.3) + (s.afe * 0.3);
-                return final.toFixed(2);
-            };
+            // Ambil semua tipe penilaian unik
+            const uniqueMeetings = useMemo(() => {
+                const types = scores.map(s => s.meeting);
+                return [...new Set(types)];
+            }, [scores]);
+
+            const calculateFinal = (s) => ((s.kog * 0.4) + (s.psi * 0.3) + (s.afe * 0.3)).toFixed(2);
 
             return (
-                <div className="bg-white rounded-2xl shadow-sm overflow-hidden fade-in">
-                    <div className="p-6 bg-slate-50 border-b flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div>
-                            <h3 className="font-black text-slate-800">Riwayat Penilaian</h3>
-                            <p className="text-[10px] text-slate-400 mt-1 font-bold italic">Bobot: 40% K, 30% P, 30% A</p>
+                <div className="space-y-6 fade-in">
+                    <div className="flex flex-col md:flex-row gap-4 justify-between items-end bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="space-y-4 flex-1">
+                            <h3 className="font-black text-slate-800 text-xl">Rekap Penilaian</h3>
+                            <div className="flex flex-wrap gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase">Lihat Berdasarkan</label>
+                                    <div className="flex border rounded-lg overflow-hidden">
+                                        <button onClick={() => setFilterType('riwayat')} className={`px-4 py-2 text-xs font-bold ${filterType === 'riwayat' ? 'bg-blue-600 text-white' : 'bg-white text-slate-500'}`}>Riwayat Input</button>
+                                        <button onClick={() => setFilterType('tipe')} className={`px-4 py-2 text-xs font-bold ${filterType === 'tipe' ? 'bg-blue-600 text-white' : 'bg-white text-slate-500'}`}>Tipe Penilaian</button>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase">Kelas</label>
+                                    <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="block w-full border p-2 rounded-lg text-xs bg-slate-50 font-bold">
+                                        <option value="">Semua Kelas</option>
+                                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                {filterType === 'tipe' && (
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase">Tipe Penilaian</label>
+                                        <select value={selectedMeetingType} onChange={e => setSelectedMeetingType(e.target.value)} className="block w-full border p-2 rounded-lg text-xs bg-slate-50 font-bold">
+                                            <option value="">Pilih Tipe</option>
+                                            {uniqueMeetings.map(m => <option key={m} value={m}>{m}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-400">Filter Kelas:</span>
-                            <select onChange={e => setFilter(e.target.value)} className="border p-2 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">Semua Kelas</option>
-                                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
+                        <div className="text-right">
+                             <p className="text-[10px] text-slate-400 font-bold italic">Bobot: 40% K, 30% P, 30% A</p>
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 font-bold text-slate-500">
-                                <tr>
-                                    <th className="p-4">Siswa</th>
-                                    <th className="p-4">Kelas</th>
-                                    <th className="p-4">Mata Pelajaran</th>
-                                    <th className="p-4 text-center">K (40%)</th>
-                                    <th className="p-4 text-center">P (30%)</th>
-                                    <th className="p-4 text-center">A (30%)</th>
-                                    <th className="p-4 text-center bg-blue-50 text-blue-700">Nilai Akhir</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {scores.filter(s => !filter || s.classId === filter).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map((s, i) => (
-                                    <tr key={i} className="hover:bg-slate-50">
-                                        <td className="p-4 font-semibold text-slate-700">{students.find(st => st.id === s.studentId)?.name || 'N/A'}</td>
-                                        <td className="p-4"><span className="px-2 py-1 bg-slate-100 rounded-md text-[10px] font-bold text-slate-600 uppercase">{classes.find(c => c.id === s.classId)?.name || '-'}</span></td>
-                                        <td className="p-4 text-slate-500">{s.subject} <span className="text-[10px] bg-blue-50 text-blue-600 px-1 rounded">{s.meeting}</span></td>
-                                        <td className="p-4 text-center font-mono text-slate-500">{s.kog}</td>
-                                        <td className="p-4 text-center font-mono text-slate-500">{s.psi}</td>
-                                        <td className="p-4 text-center font-mono text-slate-500">{s.afe}</td>
-                                        <td className="p-4 text-center font-mono font-black text-blue-700 bg-blue-50/50">{calculateFinal(s)}</td>
+
+                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px]">
+                                    <tr>
+                                        <th className="p-4">Siswa</th>
+                                        <th className="p-4">Kelas</th>
+                                        <th className="p-4">Mata Pelajaran</th>
+                                        <th className="p-4">Tipe</th>
+                                        <th className="p-4 text-center">K</th>
+                                        <th className="p-4 text-center">P</th>
+                                        <th className="p-4 text-center">A</th>
+                                        <th className="p-4 text-center bg-blue-50 text-blue-700">Nilai Akhir</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {scores
+                                        .filter(s => (!filterClass || s.classId === filterClass) && (filterType !== 'tipe' || s.meeting === selectedMeetingType))
+                                        .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))
+                                        .map((s, i) => (
+                                            <tr key={i} className="hover:bg-slate-50">
+                                                <td className="p-4 font-bold text-slate-700">{students.find(st => st.id === s.studentId)?.name || 'N/A'}</td>
+                                                <td className="p-4 text-xs font-bold text-slate-500">{classes.find(c => c.id === s.classId)?.name || '-'}</td>
+                                                <td className="p-4 text-slate-500">{s.subject}</td>
+                                                <td className="p-4"><span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-md text-[10px] font-black uppercase">{s.meeting}</span></td>
+                                                <td className="p-4 text-center font-mono text-slate-400">{s.kog}</td>
+                                                <td className="p-4 text-center font-mono text-slate-400">{s.psi}</td>
+                                                <td className="p-4 text-center font-mono text-slate-400">{s.afe}</td>
+                                                <td className="p-4 text-center font-mono font-black text-blue-700 bg-blue-50/50">{calculateFinal(s)}</td>
+                                            </tr>
+                                        ))}
+                                    {scores.length === 0 && <tr><td colSpan="8" className="p-10 text-center text-slate-400 italic">Data belum tersedia.</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             );
