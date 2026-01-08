@@ -12,15 +12,16 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; background-color: #f8fafc; color: #0f172a; }
+        .fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .sidebar-item-active { background-color: #2563eb; color: white; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4); }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body>
     <div id="root"></div>
 
     <script type="module">
@@ -50,7 +51,7 @@
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useMemo, useCallback } = React;
 
         const Icon = ({ name, size = 20, className = "" }) => {
             useEffect(() => {
@@ -100,14 +101,18 @@
 
             const handleLogout = () => window.fbUtils.signOut(window.fbAuth);
 
-            if (authLoading) return <div className="h-screen flex items-center justify-center bg-white"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+            if (authLoading) return (
+                <div className="h-screen flex items-center justify-center bg-white">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+            );
 
             if (!user) return (
                 <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
                     <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10 text-center space-y-6">
                         <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg"><Icon name="book-open" size={40} className="text-white"/></div>
                         <h1 className="text-3xl font-black text-slate-800 tracking-tight">E-Raport</h1>
-                        <p className="text-slate-500">Aplikasi Rekap Nilai Kognitif, Psikomotorik & Afektif</p>
+                        <p className="text-slate-500">Masuk untuk mengelola nilai siswa Anda secara efisien.</p>
                         <button onClick={() => window.fbUtils.signInWithPopup(window.fbAuth, window.fbProvider)} className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 py-4 rounded-2xl font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google"/> Masuk dengan Google
                         </button>
@@ -116,40 +121,54 @@
             );
 
             return (
-                <div className="min-h-screen bg-slate-50 flex overflow-hidden">
-                    <aside className="w-64 bg-slate-900 text-white h-screen sticky top-0 p-4 flex flex-col shrink-0 shadow-2xl z-20">
-                        <div className="text-2xl font-bold flex items-center gap-2 mb-10 px-2">
+                <div className="min-h-screen flex overflow-hidden bg-slate-50">
+                    {/* Sidebar Fixed */}
+                    <aside className="w-64 bg-slate-900 text-white h-screen flex flex-col shrink-0 shadow-2xl relative z-30">
+                        <div className="text-2xl font-bold flex items-center gap-2 p-6 mb-4">
                             <div className="p-2 bg-blue-600 rounded-lg"><Icon name="book-open" size={24} /></div>
                             <span>E-Raport</span>
                         </div>
-                        <nav className="flex-1 space-y-2">
+                        <nav className="flex-1 px-4 space-y-2">
                             {[
                                 { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
                                 { id: 'data-siswa', label: 'Data Siswa', icon: 'users' },
                                 { id: 'input-nilai', label: 'Input Nilai', icon: 'clipboard-check' },
                                 { id: 'rekap', label: 'Rekap Nilai', icon: 'file-text' }
                             ].map((item) => (
-                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-slate-800 text-slate-400'}`}>
-                                    <Icon name={item.icon} size={20} /> <span className="font-medium">{item.label}</span>
+                                <button 
+                                    key={item.id} 
+                                    onClick={() => setActiveTab(item.id)} 
+                                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${activeTab === item.id ? 'sidebar-item-active' : 'hover:bg-slate-800 text-slate-400'}`}
+                                >
+                                    <Icon name={item.icon} size={20} /> 
+                                    <span className="font-semibold text-sm">{item.label}</span>
                                 </button>
                             ))}
                         </nav>
-                        <div className="pt-4 border-t border-slate-800">
-                            <div className="flex items-center gap-3 p-2 mb-4 overflow-hidden">
-                                <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-blue-500 shadow-md" />
-                                <div className="truncate"><p className="text-xs font-bold truncate text-white">{user.displayName}</p><p className="text-[10px] text-slate-400 italic">Guru Pengajar</p></div>
+                        <div className="p-4 border-t border-slate-800">
+                            <div className="flex items-center gap-3 p-2 mb-4">
+                                <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-blue-500" />
+                                <div className="truncate">
+                                    <p className="text-xs font-bold truncate text-white">{user.displayName}</p>
+                                    <p className="text-[10px] text-slate-400">Guru</p>
+                                </div>
                             </div>
-                            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-bold text-sm transition-colors">
-                                <Icon name="log-out" size={18} /> Keluar
+                            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 font-bold text-xs transition-colors">
+                                <Icon name="log-out" size={16} /> Keluar Aplikasi
                             </button>
                         </div>
                     </aside>
 
-                    <main className="flex-1 h-screen overflow-y-auto p-8 max-w-7xl mx-auto w-full">
-                        {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
-                        {activeTab === 'data-siswa' && <StudentManager classes={classes} students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} user={user} />}
-                        {activeTab === 'input-nilai' && <ScoreInput classes={classes} students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} selectedSubject={selectedSubject} setSelectedSubject={setSelectedSubject} meetingName={meetingName} setMeetingName={setMeetingName} user={user} setActiveTab={setActiveTab} />}
-                        {activeTab === 'rekap' && <ReportSummary scores={scores} students={students} classes={classes} user={user} />}
+                    {/* Main Content Area */}
+                    <main className="flex-1 h-screen overflow-y-auto relative">
+                        <div className="max-w-7xl mx-auto p-8 w-full">
+                            <div className="fade-in">
+                                {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
+                                {activeTab === 'data-siswa' && <StudentManager classes={classes} students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} user={user} />}
+                                {activeTab === 'input-nilai' && <ScoreInput classes={classes} students={students} selectedClass={selectedClass} setSelectedClass={setSelectedClass} selectedSubject={selectedSubject} setSelectedSubject={setSelectedSubject} meetingName={meetingName} setMeetingName={setMeetingName} user={user} setActiveTab={setActiveTab} />}
+                                {activeTab === 'rekap' && <ReportSummary scores={scores} students={students} classes={classes} user={user} />}
+                            </div>
+                        </div>
                     </main>
                 </div>
             );
@@ -181,80 +200,78 @@
             }, [students, scores, dashFilterClass]);
 
             return (
-                <div className="space-y-8 fade-in">
+                <div className="space-y-8">
                     <header>
-                        <h2 className="text-3xl font-black text-slate-800">Dashboard Utama</h2>
-                        <p className="text-slate-500">Ringkasan performa siswa berdasarkan bobot penilaian.</p>
+                        <h2 className="text-3xl font-black text-slate-800 tracking-tight">Selamat Datang di Dashboard</h2>
+                        <p className="text-slate-500 mt-1">Pantau perkembangan nilai siswa secara real-time.</p>
                     </header>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
                             <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl"><Icon name="grid" size={28}/></div>
-                            <div><p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Kelas</p><h3 className="text-3xl font-black">{classes.length}</h3></div>
+                            <div><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Kelas</p><h3 className="text-2xl font-black">{classes.length}</h3></div>
                         </div>
-                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
                             <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon name="users" size={28}/></div>
-                            <div><p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Siswa</p><h3 className="text-3xl font-black">{students.length}</h3></div>
+                            <div><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Siswa</p><h3 className="text-2xl font-black">{students.length}</h3></div>
                         </div>
-                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                            <div className="p-4 bg-orange-50 text-orange-600 rounded-2xl"><Icon name="file-text" size={28}/></div>
-                            <div><p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Entri</p><h3 className="text-3xl font-black">{scores.length}</h3></div>
+                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
+                            <div className="p-4 bg-orange-50 text-orange-600 rounded-2xl"><Icon name="database" size={28}/></div>
+                            <div><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Total Nilai</p><h3 className="text-2xl font-black">{scores.length}</h3></div>
                         </div>
                     </div>
 
-                    <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                            <div>
-                                <h3 className="font-black text-slate-800 text-xl">Rata-rata Nilai Siswa</h3>
-                                <p className="text-xs text-slate-400 mt-1">Mengurutkan performa terbaik di kelas terpilih.</p>
-                            </div>
-                            <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl">
-                                <span className="text-xs font-bold text-slate-500 px-2 uppercase">Filter Kelas:</span>
+                    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+                        <div className="p-8 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <h3 className="font-black text-xl text-slate-800">Ranking & Rata-rata Nilai</h3>
+                            <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                                <Icon name="filter" size={14} className="text-slate-400 ml-2" />
                                 <select 
                                     value={dashFilterClass} 
                                     onChange={e => setDashFilterClass(e.target.value)} 
-                                    className="bg-white border-0 rounded-xl px-4 py-2 text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-500 outline-none min-w-[150px]"
+                                    className="bg-transparent border-none text-xs font-black uppercase outline-none pr-4"
                                 >
-                                    <option value="">Semua Siswa</option>
+                                    <option value="">Semua Kelas</option>
                                     {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
                             </div>
                         </div>
-
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
-                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[11px] tracking-wider">
+                                <thead className="bg-slate-50/50 text-slate-400 font-black uppercase text-[10px] tracking-widest">
                                     <tr>
-                                        <th className="p-4 text-left">Peringkat</th>
-                                        <th className="p-4 text-left">Nama Lengkap</th>
-                                        <th className="p-4 text-center">Kelas</th>
-                                        <th className="p-4 text-center">Jumlah Nilai</th>
-                                        <th className="p-4 text-right">Rata-rata Nilai Akhir</th>
+                                        <th className="p-6 text-left">Rank</th>
+                                        <th className="p-6 text-left">Nama Siswa</th>
+                                        <th className="p-6 text-center">Kelas</th>
+                                        <th className="p-6 text-center">Jumlah Tes</th>
+                                        <th className="p-6 text-right">Rata-rata</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y">
+                                <tbody className="divide-y divide-slate-50">
                                     {studentAverages.map((s, idx) => (
-                                        <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
-                                            <td className="p-4">
-                                                <div className={`w-8 h-8 flex items-center justify-center rounded-xl font-black text-xs ${idx === 0 ? 'bg-yellow-100 text-yellow-700 shadow-sm' : idx === 1 ? 'bg-slate-200 text-slate-700' : idx === 2 ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>
+                                        <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
+                                            <td className="p-6">
+                                                <div className={`w-8 h-8 flex items-center justify-center rounded-xl font-black text-xs ${idx === 0 ? 'bg-yellow-400 text-white shadow-lg shadow-yellow-200' : idx === 1 ? 'bg-slate-400 text-white shadow-lg shadow-slate-200' : idx === 2 ? 'bg-amber-600 text-white shadow-lg shadow-amber-200' : 'bg-slate-100 text-slate-500'}`}>
                                                     {idx + 1}
                                                 </div>
                                             </td>
-                                            <td className="p-4 font-bold text-slate-700 group-hover:text-blue-600">{s.name}</td>
-                                            <td className="p-4 text-center">
-                                                <span className="bg-slate-100 px-2 py-1 rounded-lg text-[10px] font-black text-slate-600 uppercase">
-                                                    {classes.find(c => c.id === s.classId)?.name || '-'}
-                                                </span>
+                                            <td className="p-6 font-bold text-slate-700 uppercase tracking-tight group-hover:text-blue-600 transition-colors">{s.name}</td>
+                                            <td className="p-6 text-center font-bold text-slate-400 text-xs">
+                                                {classes.find(c => c.id === s.classId)?.name || '-'}
                                             </td>
-                                            <td className="p-4 text-center text-slate-500 font-medium">{s.count} Entri</td>
-                                            <td className="p-4 text-right">
-                                                <span className={`px-4 py-2 rounded-2xl font-black text-sm shadow-sm inline-block min-w-[60px] text-center ${s.avg >= 85 ? 'bg-emerald-500 text-white' : s.avg >= 75 ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'}`}>
-                                                    {s.avg || '0'}
+                                            <td className="p-6 text-center text-slate-400 text-xs font-bold">{s.count} Entri</td>
+                                            <td className="p-6 text-right">
+                                                <span className={`px-4 py-2 rounded-2xl font-black text-sm shadow-sm inline-block min-w-[70px] text-center ${s.avg >= 80 ? 'bg-emerald-500 text-white' : s.avg >= 70 ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                                    {s.avg || '0.00'}
                                                 </span>
                                             </td>
                                         </tr>
                                     ))}
-                                    {studentAverages.length === 0 && <tr><td colSpan="5" className="p-20 text-center text-slate-400 italic font-medium">Tidak ada data siswa ditemukan untuk kriteria ini.</td></tr>}
+                                    {studentAverages.length === 0 && (
+                                        <tr>
+                                            <td colSpan="5" className="p-20 text-center text-slate-400 italic">Data belum tersedia untuk filter ini.</td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -295,60 +312,62 @@
             };
 
             return (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 fade-in">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                            <h3 className="font-black mb-4 text-lg">Manajemen Kelas</h3>
+                        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                            <h3 className="font-black mb-6 text-lg">Kelola Kelas</h3>
                             <div className="flex gap-2 mb-6">
-                                <input value={className} onChange={e => setClassName(e.target.value)} placeholder="Nama Kelas Baru" className="flex-1 border-slate-200 border p-3 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"/>
+                                <input value={className} onChange={e => setClassName(e.target.value)} placeholder="Nama Kelas..." className="flex-1 bg-slate-50 border-none p-4 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"/>
                                 <button onClick={async () => {
                                     if(!className) return;
                                     await window.fbUtils.addDoc(window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'classes'), { name: className });
                                     setClassName('');
-                                }} className="bg-blue-600 text-white p-3 rounded-2xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all"><Icon name="plus"/></button>
+                                }} className="bg-blue-600 text-white p-4 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"><Icon name="plus"/></button>
                             </div>
-                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                                 {classes.map(c => (
-                                    <div key={c.id} onClick={() => setSelectedClass(c.id)} className={`p-4 rounded-2xl cursor-pointer flex justify-between items-center transition-all ${selectedClass === c.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold'}`}>
-                                        <span className="text-sm">{c.name}</span> {selectedClass === c.id && <Icon name="check-circle-2" size={18} />}
+                                    <div key={c.id} onClick={() => setSelectedClass(c.id)} className={`p-4 rounded-2xl cursor-pointer flex justify-between items-center transition-all ${selectedClass === c.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-200' : 'bg-slate-50 text-slate-500 font-bold hover:bg-slate-100'}`}>
+                                        <span className="text-sm">{c.name}</span>
+                                        {selectedClass === c.id && <Icon name="check" size={16} />}
                                     </div>
                                 ))}
                             </div>
                         </div>
-                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                            <h3 className="font-black mb-2 text-sm uppercase text-slate-400 tracking-widest">Impor Daftar Nama</h3>
-                            <p className="text-[10px] text-slate-400 mb-4 italic">Format Excel: Kolom A langsung Nama Siswa</p>
+                        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                            <h3 className="font-black mb-4 text-xs uppercase text-slate-400 tracking-widest">Impor Excel</h3>
                             <input type="file" disabled={!selectedClass} onChange={handleExcelImport} className="block w-full text-xs text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-2xl file:border-0 file:text-xs file:font-black file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
-                            {isImporting && <p className="mt-4 text-blue-600 animate-pulse text-xs font-black flex items-center gap-2"><Icon name="loader" size={14} className="animate-spin"/> Sinkronisasi Cloud...</p>}
+                            {isImporting && <p className="mt-4 text-blue-600 animate-pulse text-[10px] font-black italic">Sedang memproses data...</p>}
                         </div>
                     </div>
                     
-                    <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 p-8 flex flex-col">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                            <h3 className="font-black text-xl">Database Siswa <span className="text-blue-600">{selectedClass && `${classes.find(c => c.id === selectedClass)?.name}`}</span></h3>
+                    <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8">
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
+                            <h3 className="font-black text-xl">Daftar Siswa {selectedClass && <span className="text-blue-600">({classes.find(c => c.id === selectedClass)?.name})</span>}</h3>
                             <div className="flex gap-2 w-full sm:w-auto">
-                                <input value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="Nama Siswa" className="border border-slate-200 p-3 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none flex-1"/>
+                                <input value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="Nama Siswa..." className="bg-slate-50 border-none p-3 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none flex-1"/>
                                 <button onClick={async () => {
                                     if(!studentName || !selectedClass) return;
                                     await window.fbUtils.addDoc(window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students'), { name: studentName, classId: selectedClass });
                                     setStudentName('');
-                                }} disabled={!selectedClass} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl text-sm font-black hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all disabled:opacity-50">Tambah</button>
+                                }} disabled={!selectedClass} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl text-sm font-black hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:opacity-30">Tambah</button>
                             </div>
                         </div>
-                        <div className="overflow-x-auto flex-1">
+                        <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px]"><tr><th className="p-4">No</th><th className="p-4">Nama Siswa (A-Z)</th><th className="p-4 text-right">Opsi</th></tr></thead>
-                                <tbody className="divide-y">
+                                <thead className="bg-slate-50/50 text-slate-400 font-black uppercase text-[10px] tracking-widest">
+                                    <tr><th className="p-4">No</th><th className="p-4">Nama Siswa</th><th className="p-4 text-right">Opsi</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
                                     {filteredStudents.map((s, idx) => (
-                                        <tr key={s.id} className="hover:bg-slate-50 group">
-                                            <td className="p-4 text-slate-400 font-mono text-xs">{idx + 1}</td>
-                                            <td className="p-4 font-bold text-slate-700 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{s.name}</td>
+                                        <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-4 text-slate-300 font-mono text-xs">{idx + 1}</td>
+                                            <td className="p-4 font-bold text-slate-700 uppercase tracking-tight">{s.name}</td>
                                             <td className="p-4 text-right">
-                                                <button onClick={() => confirm(`Hapus ${s.name} dari sistem?`) && window.fbUtils.deleteDoc(window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students', s.id))} className="text-slate-300 hover:text-red-500 transition-colors p-2"><Icon name="trash-2" size={18} /></button>
+                                                <button onClick={() => confirm(`Hapus ${s.name}?`) && window.fbUtils.deleteDoc(window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students', s.id))} className="text-slate-300 hover:text-red-500 transition-colors"><Icon name="trash-2" size={18} /></button>
                                             </td>
                                         </tr>
                                     ))}
-                                    {filteredStudents.length === 0 && <tr><td colSpan="3" className="p-20 text-center text-slate-400 italic font-medium">Silakan pilih kelas atau tambahkan siswa baru.</td></tr>}
+                                    {filteredStudents.length === 0 && <tr><td colSpan="3" className="p-20 text-center text-slate-400 italic">Pilih kelas di kiri untuk melihat daftar siswa.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -359,47 +378,60 @@
 
         const ScoreInput = ({ classes, students, selectedClass, setSelectedClass, selectedSubject, setSelectedSubject, meetingName, setMeetingName, user, setActiveTab }) => {
             const [localScores, setLocalScores] = useState({});
-            const filteredStudents = students.filter(s => s.classId === selectedClass).sort((a, b) => a.name.localeCompare(b.name));
+            const filteredStudents = useMemo(() => students.filter(s => s.classId === selectedClass).sort((a, b) => a.name.localeCompare(b.name)), [students, selectedClass]);
             
             const save = async () => {
-                if (!selectedSubject || !meetingName || !selectedClass) return alert("Mohon lengkapi Kelas, Mapel, dan Tipe Penilaian!");
+                if (!selectedSubject || !meetingName || !selectedClass) return alert("Lengkapi Mapel dan Tipe!");
                 const entries = Object.values(localScores);
-                if (entries.length === 0) return alert("Belum ada nilai yang diisi!");
+                if (entries.length === 0) return alert("Isi nilai dahulu!");
                 const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'scores');
                 await Promise.all(entries.map(s => window.fbUtils.addDoc(col, { ...s, subject: selectedSubject, meeting: meetingName, classId: selectedClass, timestamp: new Date().toISOString() })));
-                alert("Nilai berhasil disimpan!"); setActiveTab('rekap');
+                alert("Nilai Disimpan!"); setActiveTab('rekap');
             };
 
             return (
-                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 fade-in space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-3xl">
-                        <div><label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Pilih Kelas</label><select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="w-full border-0 shadow-sm p-4 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"><option value="">Klik untuk memilih...</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-                        <div><label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Mata Pelajaran</label><input value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} placeholder="Matematika" className="w-full border-0 shadow-sm p-4 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"/></div>
-                        <div><label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Tipe Penilaian</label><input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="UH 1 / UTS / UAS" className="w-full border-0 shadow-sm p-4 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Kelas</label>
+                            <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="">Pilih...</option>
+                                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mata Pelajaran</label>
+                            <input value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} placeholder="Matematika" className="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"/>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipe Penilaian</label>
+                            <input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="UH 1 / UTS" className="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"/>
+                        </div>
                     </div>
-                    <div className="overflow-x-auto rounded-3xl border border-slate-100">
+                    
+                    <div className="overflow-hidden border border-slate-100 rounded-2xl">
                         <table className="w-full text-sm">
-                            <thead className="bg-slate-900 text-white font-bold uppercase text-[10px] tracking-wider">
+                            <thead className="bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest">
                                 <tr>
-                                    <th className="p-5 text-left">Daftar Nama Siswa</th>
-                                    <th className="p-5 text-center w-36">Kognitif (40%)</th>
-                                    <th className="p-5 text-center w-36">Psiko (30%)</th>
-                                    <th className="p-5 text-center w-36">Afektif (30%)</th>
+                                    <th className="p-5 text-left">Nama Siswa</th>
+                                    <th className="p-5 text-center w-32">Kognitif</th>
+                                    <th className="p-5 text-center w-32">Psiko</th>
+                                    <th className="p-5 text-center w-32">Afektif</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y">
+                            <tbody className="divide-y divide-slate-100">
                                 {filteredStudents.map(s => (
                                     <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-5 font-black text-slate-700 uppercase tracking-tight text-xs">{s.name}</td>
-                                        <td className="p-5"><input type="number" onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), kog:parseFloat(e.target.value)||0}}))} className="w-full border p-3 rounded-2xl text-center font-bold focus:ring-2 focus:ring-blue-500 bg-slate-50 border-0" placeholder="0-100" /></td>
-                                        <td className="p-5"><input type="number" onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), psi:parseFloat(e.target.value)||0}}))} className="w-full border p-3 rounded-2xl text-center font-bold focus:ring-2 focus:ring-blue-500 bg-slate-50 border-0" placeholder="0-100" /></td>
-                                        <td className="p-5"><input type="number" onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), afe:parseFloat(e.target.value)||0}}))} className="w-full border p-3 rounded-2xl text-center font-bold focus:ring-2 focus:ring-blue-500 bg-slate-50 border-0" placeholder="0-100" /></td>
+                                        <td className="p-5 font-bold text-slate-700 uppercase text-xs tracking-tight">{s.name}</td>
+                                        <td className="p-5"><input type="number" onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), kog:parseFloat(e.target.value)||0}}))} className="w-full bg-slate-100 border-none p-3 rounded-xl text-center font-bold focus:ring-2 focus:ring-blue-500" placeholder="0" /></td>
+                                        <td className="p-5"><input type="number" onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), psi:parseFloat(e.target.value)||0}}))} className="w-full bg-slate-100 border-none p-3 rounded-xl text-center font-bold focus:ring-2 focus:ring-blue-500" placeholder="0" /></td>
+                                        <td className="p-5"><input type="number" onChange={e => setLocalScores(p => ({...p, [s.id]:{...(p[s.id]||{studentId:s.id,kog:0,psi:0,afe:0}), afe:parseFloat(e.target.value)||0}}))} className="w-full bg-slate-100 border-none p-3 rounded-xl text-center font-bold focus:ring-2 focus:ring-blue-500" placeholder="0" /></td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-                    <button onClick={save} className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-lg shadow-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"><Icon name="cloud-upload" /> Publikasikan Nilai</button>
+                    <button onClick={save} className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black text-lg shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-3"><Icon name="save" /> Simpan Semua Nilai</button>
                 </div>
             );
         };
@@ -408,144 +440,135 @@
             const [filterClass, setFilterClass] = useState('');
             const [filterType, setFilterType] = useState('riwayat');
             const [selectedMeetingType, setSelectedMeetingType] = useState('');
-            
-            // Edit State
             const [editingId, setEditingId] = useState(null);
             const [editForm, setEditForm] = useState({ kog: 0, psi: 0, afe: 0 });
 
             const uniqueMeetings = useMemo(() => [...new Set(scores.map(s => s.meeting))], [scores]);
             const calculateFinal = (s) => ((s.kog * 0.4) + (s.psi * 0.3) + (s.afe * 0.3)).toFixed(2);
 
-            const handleStartEdit = (score) => {
-                setEditingId(score.id);
-                setEditForm({ kog: score.kog, psi: score.psi, afe: score.afe });
-            };
+            const filteredScores = useMemo(() => {
+                return scores
+                    .filter(s => (!filterClass || s.classId === filterClass) && (filterType !== 'tipe' || s.meeting === selectedMeetingType))
+                    .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            }, [scores, filterClass, filterType, selectedMeetingType]);
 
-            const handleCancelEdit = () => {
+            const exportToExcel = useCallback(() => {
+                if (filteredScores.length === 0) return alert("Tidak ada data untuk diekspor!");
+                
+                const dataToExport = filteredScores.map(s => {
+                    const student = students.find(st => st.id === s.studentId);
+                    const className = classes.find(c => c.id === s.classId)?.name || '-';
+                    return {
+                        "Nama Siswa": student?.name || 'N/A',
+                        "Kelas": className,
+                        "Mata Pelajaran": s.subject,
+                        "Tipe Penilaian": s.meeting,
+                        "Kognitif (40%)": s.kog,
+                        "Psikomotor (30%)": s.psi,
+                        "Afektif (30%)": s.afe,
+                        "Nilai Akhir": calculateFinal(s)
+                    };
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Rekap Nilai");
+                XLSX.writeFile(workbook, `Rekap_Nilai_${new Date().toLocaleDateString()}.xlsx`);
+            }, [filteredScores, students, classes]);
+
+            const handleSaveEdit = async (scoreId) => {
+                const docRef = window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'scores', scoreId);
+                await window.fbUtils.updateDoc(docRef, { kog: parseFloat(editForm.kog), psi: parseFloat(editForm.psi), afe: parseFloat(editForm.afe) });
                 setEditingId(null);
             };
 
-            const handleSaveEdit = async (scoreId) => {
-                try {
-                    const docRef = window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'scores', scoreId);
-                    await window.fbUtils.updateDoc(docRef, {
-                        kog: parseFloat(editForm.kog),
-                        psi: parseFloat(editForm.psi),
-                        afe: parseFloat(editForm.afe)
-                    });
-                    setEditingId(null);
-                } catch (err) {
-                    alert("Gagal mengupdate nilai.");
-                }
-            };
-
             return (
-                <div className="space-y-6 fade-in pb-10">
-                    <div className="flex flex-col md:flex-row gap-6 justify-between items-end bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                        <div className="space-y-6 flex-1 w-full">
-                            <h3 className="font-black text-slate-800 text-2xl tracking-tight">Rekapitulasi Penilaian</h3>
+                <div className="space-y-6">
+                    <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-end gap-6">
+                        <div className="flex-1 space-y-6 w-full">
+                            <h3 className="font-black text-2xl text-slate-800">Rekapitulasi Penilaian</h3>
                             <div className="flex flex-wrap gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mode Tampilan</label>
-                                    <div className="flex bg-slate-100 p-1 rounded-2xl overflow-hidden border border-slate-200">
-                                        <button onClick={() => setFilterType('riwayat')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${filterType === 'riwayat' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>Riwayat Input</button>
-                                        <button onClick={() => setFilterType('tipe')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${filterType === 'tipe' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>Tipe Penilaian</button>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tampilan</label>
+                                    <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+                                        <button onClick={() => setFilterType('riwayat')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${filterType === 'riwayat' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>Riwayat</button>
+                                        <button onClick={() => setFilterType('tipe')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${filterType === 'tipe' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>Kategori</button>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-1">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter Kelas</label>
-                                    <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="block w-full border border-slate-200 p-3 rounded-2xl text-xs font-black bg-white focus:ring-2 focus:ring-blue-500 outline-none shadow-sm">
+                                    <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="block w-full bg-slate-50 border-none p-3 rounded-xl text-xs font-black">
                                         <option value="">Semua Kelas</option>
                                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
                                 {filterType === 'tipe' && (
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe Penilaian</label>
-                                        <select value={selectedMeetingType} onChange={e => setSelectedMeetingType(e.target.value)} className="block w-full border border-slate-200 p-3 rounded-2xl text-xs font-black bg-white focus:ring-2 focus:ring-blue-500 outline-none shadow-sm min-w-[120px]">
-                                            <option value="">Pilih Tipe</option>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kategori</label>
+                                        <select value={selectedMeetingType} onChange={e => setSelectedMeetingType(e.target.value)} className="block w-full bg-slate-50 border-none p-3 rounded-xl text-xs font-black min-w-[120px]">
+                                            <option value="">Semua Tipe</option>
                                             {uniqueMeetings.map(m => <option key={m} value={m}>{m}</option>)}
                                         </select>
                                     </div>
                                 )}
                             </div>
                         </div>
-                        <div className="text-right hidden md:block">
-                             <div className="bg-blue-50 p-4 rounded-2xl inline-block border border-blue-100">
-                                <p className="text-[10px] text-blue-800 font-black uppercase tracking-widest mb-1 text-center">Rumus Bobot</p>
-                                <p className="text-[11px] font-bold text-blue-600">40% K + 30% P + 30% A</p>
-                             </div>
-                        </div>
+                        <button onClick={exportToExcel} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center gap-2"><Icon name="download" size={18} /> Unduh Excel</button>
                     </div>
 
-                    <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                                <thead className="bg-slate-50/50 text-slate-400 font-black uppercase text-[10px] tracking-widest">
                                     <tr>
-                                        <th className="p-6">Siswa</th>
-                                        <th className="p-6">Kelas</th>
-                                        <th className="p-6">Mata Pelajaran</th>
-                                        <th className="p-6 text-center">K (40%)</th>
-                                        <th className="p-6 text-center">P (30%)</th>
-                                        <th className="p-6 text-center">A (30%)</th>
-                                        <th className="p-6 text-center bg-blue-50 text-blue-700">Akhir</th>
-                                        <th className="p-6 text-right">Opsi</th>
+                                        <th className="p-6">Siswa / Kategori</th>
+                                        <th className="p-6">Kelas / Mapel</th>
+                                        <th className="p-6 text-center">K</th>
+                                        <th className="p-6 text-center">P</th>
+                                        <th className="p-6 text-center">A</th>
+                                        <th className="p-6 text-center bg-blue-50/50 text-blue-600">Nilai Akhir</th>
+                                        <th className="p-6 text-right">Aksi</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {scores
-                                        .filter(s => (!filterClass || s.classId === filterClass) && (filterType !== 'tipe' || s.meeting === selectedMeetingType))
-                                        .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))
-                                        .map((s, i) => (
-                                            <tr key={s.id} className={`${editingId === s.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'} transition-all`}>
-                                                <td className="p-6">
-                                                    <p className="font-black text-slate-700 uppercase tracking-tight">{students.find(st => st.id === s.studentId)?.name || 'N/A'}</p>
-                                                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">{s.meeting}</p>
-                                                </td>
-                                                <td className="p-6"><span className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-500 uppercase">{classes.find(c => c.id === s.classId)?.name || '-'}</span></td>
-                                                <td className="p-6 text-slate-500 font-medium">{s.subject}</td>
-                                                
-                                                {/* Kognitif Cell */}
-                                                <td className="p-6 text-center font-mono font-bold">
-                                                    {editingId === s.id ? 
-                                                        <input type="number" value={editForm.kog} onChange={e => setEditForm({...editForm, kog: e.target.value})} className="w-16 border rounded-lg p-1 text-center bg-white" />
-                                                        : s.kog}
-                                                </td>
-                                                
-                                                {/* Psikomotor Cell */}
-                                                <td className="p-6 text-center font-mono font-bold">
-                                                    {editingId === s.id ? 
-                                                        <input type="number" value={editForm.psi} onChange={e => setEditForm({...editForm, psi: e.target.value})} className="w-16 border rounded-lg p-1 text-center bg-white" />
-                                                        : s.psi}
-                                                </td>
-                                                
-                                                {/* Afektif Cell */}
-                                                <td className="p-6 text-center font-mono font-bold">
-                                                    {editingId === s.id ? 
-                                                        <input type="number" value={editForm.afe} onChange={e => setEditForm({...editForm, afe: e.target.value})} className="w-16 border rounded-lg p-1 text-center bg-white" />
-                                                        : s.afe}
-                                                </td>
-
-                                                <td className="p-6 text-center font-mono font-black text-blue-700 bg-blue-50/30">
-                                                    {editingId === s.id ? '-' : calculateFinal(s)}
-                                                </td>
-                                                <td className="p-6 text-right">
-                                                    {editingId === s.id ? (
-                                                        <div className="flex gap-2 justify-end">
-                                                            <button onClick={() => handleSaveEdit(s.id)} className="bg-emerald-600 text-white p-2 rounded-xl shadow-md"><Icon name="check" size={16}/></button>
-                                                            <button onClick={handleCancelEdit} className="bg-red-500 text-white p-2 rounded-xl shadow-md"><Icon name="x" size={16}/></button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex gap-2 justify-end">
-                                                            <button onClick={() => handleStartEdit(s)} className="text-slate-400 hover:text-blue-600 p-2"><Icon name="edit-3" size={18} /></button>
-                                                            <button onClick={() => confirm('Hapus entri nilai ini?') && window.fbUtils.deleteDoc(window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'scores', s.id))} className="text-slate-300 hover:text-red-500 p-2"><Icon name="trash-2" size={18} /></button>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    {scores.length === 0 && <tr><td colSpan="8" className="p-20 text-center text-slate-400 italic font-medium">Data rekapitulasi belum tersedia. Mulailah menginput nilai.</td></tr>}
+                                <tbody className="divide-y divide-slate-50">
+                                    {filteredScores.map((s) => (
+                                        <tr key={s.id} className={`${editingId === s.id ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'} transition-colors`}>
+                                            <td className="p-6">
+                                                <p className="font-black text-slate-700 uppercase tracking-tight">{students.find(st => st.id === s.studentId)?.name || 'N/A'}</p>
+                                                <p className="text-[10px] font-bold text-blue-500 mt-0.5">{s.meeting}</p>
+                                            </td>
+                                            <td className="p-6">
+                                                <p className="font-bold text-slate-400 text-xs">{classes.find(c => c.id === s.classId)?.name || '-'}</p>
+                                                <p className="text-[10px] text-slate-400 uppercase font-bold">{s.subject}</p>
+                                            </td>
+                                            <td className="p-6 text-center font-bold">
+                                                {editingId === s.id ? <input type="number" value={editForm.kog} onChange={e => setEditForm({...editForm, kog: e.target.value})} className="w-14 bg-white border border-slate-200 rounded p-1 text-center" /> : s.kog}
+                                            </td>
+                                            <td className="p-6 text-center font-bold">
+                                                {editingId === s.id ? <input type="number" value={editForm.psi} onChange={e => setEditForm({...editForm, psi: e.target.value})} className="w-14 bg-white border border-slate-200 rounded p-1 text-center" /> : s.psi}
+                                            </td>
+                                            <td className="p-6 text-center font-bold">
+                                                {editingId === s.id ? <input type="number" value={editForm.afe} onChange={e => setEditForm({...editForm, afe: e.target.value})} className="w-14 bg-white border border-slate-200 rounded p-1 text-center" /> : s.afe}
+                                            </td>
+                                            <td className="p-6 text-center font-black text-blue-600 bg-blue-50/20">
+                                                {calculateFinal(s)}
+                                            </td>
+                                            <td className="p-6 text-right">
+                                                {editingId === s.id ? (
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button onClick={() => handleSaveEdit(s.id)} className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-xl transition-colors"><Icon name="check" size={18}/></button>
+                                                        <button onClick={() => setEditingId(null)} className="text-red-500 hover:bg-red-50 p-2 rounded-xl transition-colors"><Icon name="x" size={18}/></button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button onClick={() => { setEditingId(s.id); setEditForm({kog: s.kog, psi: s.psi, afe: s.afe}); }} className="text-slate-300 hover:text-blue-600 p-2 transition-colors"><Icon name="edit-2" size={18} /></button>
+                                                        <button onClick={() => confirm('Hapus nilai?') && window.fbUtils.deleteDoc(window.fbUtils.doc(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'scores', s.id))} className="text-slate-300 hover:text-red-500 p-2 transition-colors"><Icon name="trash-2" size={18} /></button>
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {filteredScores.length === 0 && <tr><td colSpan="7" className="p-20 text-center text-slate-400 italic">Tidak ada data penilaian yang ditemukan.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
