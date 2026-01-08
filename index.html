@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Raport: Sistem Manajemen Nilai</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Firebase Mock & Config (Global environment variables)
+        const firebaseConfig = JSON.parse(__firebase_config || "{}");
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'manajemen-nilai-siswa';
+
+        // Core Components & Icons (Using SVG for reliability in single HTML)
+        const Icon = ({ name, size = 20, className = "" }) => {
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        };
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [classes, setClasses] = useState([]);
+            const [students, setStudents] = useState([]);
+            const [scores, setScores] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [selectedClass, setSelectedClass] = useState('');
+            const [selectedSubject, setSelectedSubject] = useState('');
+            const [meetingName, setMeetingName] = useState('');
+
+            useEffect(() => {
+                // Initialize Lucide icons after render
+                lucide.createIcons();
+            }, [activeTab, classes, students]);
+
+            // --- Handlers ---
+            const handleAddClass = (name) => {
+                if (!name) return;
+                const newClass = { id: Date.now().toString(), name };
+                setClasses([...classes, newClass]);
+            };
+
+            const handleDeleteClass = (id) => {
+                setClasses(classes.filter(c => c.id !== id));
+                if (selectedClass === id) setSelectedClass('');
+            };
+
+            const handleAddStudent = (student) => {
+                setStudents([...students, { ...student, id: Date.now().toString() }]);
+            };
+
+            const handleExcelImport = (e) => {
+                const file = e.target.files[0];
+                if (!file || !selectedClass) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const text = evt.target.result;
+                    const rows = text.split('\n').slice(1);
+                    const newStudents = rows.map(row => {
+                        const [nis, name] = row.split(',');
+                        if (name) return { id: Math.random().toString(), nis: nis.trim(), name: name.trim(), classId: selectedClass };
+                        return null;
+                    }).filter(Boolean);
+                    setStudents([...students, ...newStudents]);
+                };
+                reader.readAsText(file);
+            };
+
+            const handleSaveScores = (newScores) => {
+                const prepared = newScores.map(s => ({
+                    ...s,
+                    id: Date.now() + Math.random(),
+                    classId: selectedClass,
+                    subject: selectedSubject,
+                    meeting: meetingName
+                }));
+                setScores([...scores, ...prepared]);
+                setActiveTab('rekap');
+            };
+
+            // --- UI Components ---
+            const Sidebar = () => (
+                <div className="w-64 bg-slate-900 text-white h-screen fixed left-0 top-0 p-4 flex flex-col">
+                    <div className="text-2xl font-bold flex items-center gap-2 mb-10 px-2">
+                        <div className="p-2 bg-blue-600 rounded-lg">
+                            <Icon name="book-open" size={24} />
+                        </div>
+                        <span>E-Raport</span>
+                    </div>
+                    <nav className="flex-1 space-y-2">
+                        {[
+                            { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+                            { id: 'data-siswa', label: 'Data Siswa', icon: 'users' },
+                            { id: 'input-nilai', label: 'Input Nilai', icon: 'clipboard-check' },
+                            { id: 'rekap', label: 'Rekap Nilai', icon: 'file-text' },
+                        ].map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => setActiveTab(item.id)}
+                                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${
+                                    activeTab === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-slate-800 text-slate-400'
+                                }`}
+                            >
+                                <Icon name={item.icon} size={20} />
+                                <span className="font-medium">{item.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen bg-slate-50">
+                    <Sidebar />
+                    <main className="ml-64 p-8">
+                        <header className="flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            <div>
+                                <h1 className="text-2xl font-bold text-slate-800 capitalize">{activeTab.replace('-', ' ')}</h1>
+                                <p className="text-slate-500 text-sm">Manajemen Akademik Real-time</p>
+                            </div>
+                            <div className="flex items-center gap-3 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 text-xs font-bold">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                SISTEM ONLINE
+                            </div>
+                        </header>
+
+                        {activeTab === 'dashboard' && <DashboardStats classes={classes} students={students} scores={scores} setActiveTab={setActiveTab} />}
+                        {activeTab === 'data-siswa' && (
+                            <StudentManager 
+                                classes={classes} 
+                                students={students} 
+                                selectedClass={selectedClass}
+                                setSelectedClass={setSelectedClass}
+                                onAddClass={handleAddClass}
+                                onDeleteClass={handleDeleteClass}
+                                onAddStudent={handleAddStudent}
+                                onImport={handleExcelImport}
+                                setStudents={setStudents}
+                            />
+                        )}
+                        {activeTab === 'input-nilai' && (
+                            <ScoreInput 
+                                classes={classes}
+                                students={students}
+                                selectedClass={selectedClass}
+                                setSelectedClass={setSelectedClass}
+                                selectedSubject={selectedSubject}
+                                setSelectedSubject={setSelectedSubject}
+                                meetingName={meetingName}
+                                setMeetingName={setMeetingName}
+                                onSave={handleSaveScores}
+                            />
+                        )}
+                        {activeTab === 'rekap' && (
+                            <ReportSummary 
+                                scores={scores}
+                                students={students}
+                                selectedClass={selectedClass}
+                            />
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        // --- SUB-COMPONENTS ---
+
+        const DashboardStats = ({ classes, students, scores, setActiveTab }) => (
+            <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                        <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl"><Icon name="home" size={28}/></div>
+                        <div><p className="text-slate-500 text-sm font-medium">Total Kelas</p><h3 className="text-2xl font-bold">{classes.length}</h3></div>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                        <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon name="users" size={28}/></div>
+                        <div><p className="text-slate-500 text-sm font-medium">Total Siswa</p><h3 className="text-2xl font-bold">{students.length}</h3></div>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                        <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl"><Icon name="check-square" size={28}/></div>
+                        <div><p className="text-slate-500 text-sm font-medium">Total Nilai Terinput</p><h3 className="text-2xl font-bold">{scores.length}</h3></div>
+                    </div>
+                </div>
+                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-10 text-white shadow-xl">
+                    <h2 className="text-3xl font-bold mb-4">Selamat Datang di Portal Nilai</h2>
+                    <p className="text-blue-100 max-w-xl mb-8 leading-relaxed">Kelola data akademik sekolah Anda dengan mudah. Mulai dari manajemen kelas, input nilai harian, hingga rekapitulasi otomatis.</p>
+                    <div className="flex gap-4">
+                        <button onClick={() => setActiveTab('data-siswa')} className="bg-white text-blue-700 px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition-colors">Kelola Siswa</button>
+                        <button onClick={() => setActiveTab('input-nilai')} className="bg-blue-500/30 backdrop-blur-md text-white border border-blue-400 px-6 py-3 rounded-xl font-bold hover:bg-blue-500/50 transition-colors">Input Nilai</button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const StudentManager = ({ classes, students, selectedClass, setSelectedClass, onAddClass, onDeleteClass, onAddStudent, onImport, setStudents }) => {
+            const [className, setClassName] = useState('');
+            const [studentForm, setStudentForm] = useState({ nis: '', name: '' });
+            const filteredStudents = students.filter(s => s.classId === selectedClass);
+
+            return (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="space-y-6">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            <h3 className="font-bold mb-4 flex items-center gap-2"><Icon name="grid" size={18}/> Manajemen Kelas</h3>
+                            <div className="flex gap-2 mb-4">
+                                <input value={className} onChange={e => setClassName(e.target.value)} placeholder="Nama Kelas" className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
+                                <button onClick={() => { onAddClass(className); setClassName(''); }} className="bg-blue-600 text-white p-2 rounded-lg"><Icon name="plus"/></button>
+                            </div>
+                            <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar">
+                                {classes.map(c => (
+                                    <div key={c.id} onClick={() => setSelectedClass(c.id)} className={`flex justify-between items-center p-3 rounded-xl cursor-pointer transition-colors ${selectedClass === c.id ? 'bg-blue-50 border border-blue-100 text-blue-700' : 'hover:bg-slate-50 text-slate-600'}`}>
+                                        <span className="font-medium">{c.name}</span>
+                                        <button onClick={(e) => { e.stopPropagation(); onDeleteClass(c.id); }} className="text-slate-400 hover:text-red-500"><Icon name="trash-2" size={16}/></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            <h3 className="font-bold mb-4 flex items-center gap-2"><Icon name="upload" size={18}/> Import Excel (CSV)</h3>
+                            <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center">
+                                <Icon name="file-spreadsheet" size={32} className="mx-auto text-slate-400 mb-2"/>
+                                <p className="text-xs text-slate-500 mb-3">Format: NIS, Nama</p>
+                                <input type="file" accept=".csv" disabled={!selectedClass} onChange={onImport} className="text-xs w-full block"/>
+                                {!selectedClass && <p className="mt-2 text-[10px] text-orange-500">Pilih kelas dulu</p>}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="lg:col-span-2">
+                        {selectedClass ? (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                    <h3 className="font-bold">Daftar Siswa - {classes.find(c => c.id === selectedClass)?.name}</h3>
+                                    <div className="flex gap-2">
+                                        <input value={studentForm.nis} onChange={e => setStudentForm({...studentForm, nis: e.target.value})} placeholder="NIS" className="border border-slate-200 rounded-lg px-3 py-1 text-sm w-24 outline-none"/>
+                                        <input value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} placeholder="Nama Siswa" className="border border-slate-200 rounded-lg px-3 py-1 text-sm outline-none"/>
+                                        <button onClick={() => { onAddStudent({...studentForm, classId: selectedClass}); setStudentForm({nis:'', name:''}); }} className="bg-emerald-600 text-white px-4 py-1 rounded-lg text-sm font-bold">Simpan</button>
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50">
+                                                <th className="px-6 py-4">NIS</th>
+                                                <th className="px-6 py-4">Nama Lengkap</th>
+                                                <th className="px-6 py-4 text-right">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {filteredStudents.length > 0 ? filteredStudents.map(s => (
+                                                <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
+                                                    <td className="px-6 py-4 text-sm text-slate-600">{s.nis}</td>
+                                                    <td className="px-6 py-4 text-sm font-semibold text-slate-800">{s.name}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button onClick={() => setStudents(students.filter(std => std.id !== s.id))} className="text-red-400 hover:text-red-600 transition-colors"><Icon name="user-minus" size={18}/></button>
+                                                    </td>
+                                                </tr>
+                                            )) : (
+                                                <tr><td colSpan="3" className="px-6 py-10 text-center text-slate-400 italic">Belum ada data siswa di kelas ini</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-400 p-10">
+                                <Icon name="mouse-pointer-2" size={48} className="mb-4 opacity-20"/>
+                                <p className="font-medium text-lg">Silakan pilih kelas terlebih dahulu</p>
+                                <p className="text-sm">Data siswa akan muncul setelah kelas dipilih pada menu kiri</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const ScoreInput = ({ classes, students, selectedClass, setSelectedClass, selectedSubject, setSelectedSubject, meetingName, setMeetingName, onSave }) => {
+            const [tempScores, setTempScores] = useState({});
+            const filteredStudents = students.filter(s => s.classId === selectedClass);
+
+            const handleScoreChange = (sid, field, val) => {
+                setTempScores(prev => ({
+                    ...prev,
+                    [sid]: { ...prev[sid], studentId: sid, [field]: val }
+                }));
+            };
+
+            const isValid = selectedClass && selectedSubject && meetingName && filteredStudents.length > 0;
+
+            return (
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">Pilih Kelas</label>
+                            <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Pilih Kelas...</option>
+                                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">Mata Pelajaran</label>
+                            <input value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} placeholder="Misal: Matematika" className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"/>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">Nama Pertemuan</label>
+                            <input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="Misal: UH 1 / Pertemuan 1" className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"/>
+                        </div>
+                    </div>
+
+                    {isValid ? (
+                        <div className="space-y-6">
+                            <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                                <table className="w-full border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase">
+                                            <th className="p-4 text-left border-b">Nama Siswa</th>
+                                            <th className="p-4 text-center border-b w-40">Kognitif</th>
+                                            <th className="p-4 text-center border-b w-40">Psikomotorik</th>
+                                            <th className="p-4 text-center border-b w-40">Afektif</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {filteredStudents.map(s => (
+                                            <tr key={s.id}>
+                                                <td className="p-4 font-semibold text-slate-800">{s.name}</td>
+                                                <td className="p-4">
+                                                    <input onChange={e => handleScoreChange(s.id, 'kog', e.target.value)} placeholder="A-D / 0-100" className="w-full text-center p-2 rounded-lg border border-transparent hover:border-slate-200 focus:border-blue-500 outline-none transition-all"/>
+                                                </td>
+                                                <td className="p-4">
+                                                    <input onChange={e => handleScoreChange(s.id, 'psi', e.target.value)} placeholder="A-D / 0-100" className="w-full text-center p-2 rounded-lg border border-transparent hover:border-slate-200 focus:border-blue-500 outline-none transition-all"/>
+                                                </td>
+                                                <td className="p-4">
+                                                    <input onChange={e => handleScoreChange(s.id, 'afe', e.target.value)} placeholder="A-D / 0-100" className="w-full text-center p-2 rounded-lg border border-transparent hover:border-slate-200 focus:border-blue-500 outline-none transition-all"/>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="flex justify-end">
+                                <button onClick={() => onSave(Object.values(tempScores))} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-bold shadow-xl shadow-blue-200 hover:bg-blue-700 hover:-translate-y-1 transition-all">Simpan Nilai Sekarang</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="py-20 text-center space-y-4">
+                            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
+                                <Icon name="clipboard" size={32} className="text-slate-300"/>
+                            </div>
+                            <p className="text-slate-400 font-medium">Lengkapi form di atas untuk memulai input nilai.</p>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ReportSummary = ({ scores, students, selectedClass }) => {
+            const [mode, setMode] = useState('per-meeting');
+
+            const reportData = useMemo(() => {
+                const map = {};
+                scores.forEach(s => {
+                    if (!map[s.studentId]) map[s.studentId] = { id: s.studentId, k: [], p: [], a: [] };
+                    if (!isNaN(s.kog)) map[s.studentId].k.push(parseFloat(s.kog));
+                    if (!isNaN(s.psi)) map[s.studentId].p.push(parseFloat(s.psi));
+                    if (!isNaN(s.afe)) map[s.studentId].a.push(parseFloat(s.afe));
+                });
+                return Object.values(map).map(m => ({
+                    ...m,
+                    name: students.find(st => st.id === m.id)?.name || 'Siswa',
+                    nis: students.find(st => st.id === m.id)?.nis || '-',
+                    avgK: m.k.length ? (m.k.reduce((a,b)=>a+b,0)/m.k.length).toFixed(1) : '-',
+                    avgP: m.p.length ? (m.p.reduce((a,b)=>a+b,0)/m.p.length).toFixed(1) : '-',
+                    avgA: m.a.length ? (m.a.reduce((a,b)=>a+b,0)/m.a.length).toFixed(1) : '-',
+                }));
+            }, [scores, students]);
+
+            return (
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50">
+                        <div>
+                            <h3 className="text-xl font-bold">Rekapitulasi Hasil Belajar</h3>
+                            <p className="text-sm text-slate-500">Hasil kumulatif kognitif, psikomotorik, dan afektif</p>
+                        </div>
+                        <div className="flex bg-white p-1 rounded-xl shadow-inner border border-slate-200">
+                            <button onClick={() => setMode('per-meeting')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'per-meeting' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Detail Pertemuan</button>
+                            <button onClick={() => setMode('final')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'final' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Rata-rata Akhir</button>
+                        </div>
+                    </div>
+                    
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="bg-slate-100/50 text-slate-600 text-xs font-bold uppercase">
+                                    <th className="px-6 py-4 text-left">NIS</th>
+                                    <th className="px-6 py-4 text-left">Nama Siswa</th>
+                                    {mode === 'per-meeting' ? (
+                                        <>
+                                            <th className="px-6 py-4 text-center">Pertemuan</th>
+                                            <th className="px-6 py-4 text-center text-blue-600">Kog</th>
+                                            <th className="px-6 py-4 text-center text-emerald-600">Psi</th>
+                                            <th className="px-6 py-4 text-center text-orange-600">Afe</th>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <th className="px-6 py-4 text-center text-blue-700 bg-blue-50 font-black">Rata Kognitif</th>
+                                            <th className="px-6 py-4 text-center text-emerald-700 bg-emerald-50 font-black">Rata Psikomotorik</th>
+                                            <th className="px-6 py-4 text-center text-orange-700 bg-orange-50 font-black">Rata Afektif</th>
+                                        </>
+                                    )}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {mode === 'per-meeting' ? (
+                                    scores.map((s, i) => (
+                                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 text-sm text-slate-500 font-mono">{students.find(st => st.id === s.studentId)?.nis}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-800">{students.find(st => st.id === s.studentId)?.name}</td>
+                                            <td className="px-6 py-4 text-center"><span className="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600 uppercase tracking-tighter">{s.meeting}</span></td>
+                                            <td className="px-6 py-4 text-center font-medium">{s.kog}</td>
+                                            <td className="px-6 py-4 text-center font-medium">{s.psi}</td>
+                                            <td className="px-6 py-4 text-center font-medium">{s.afe}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    reportData.map((r, i) => (
+                                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 text-sm text-slate-500">{r.nis}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-800">{r.name}</td>
+                                            <td className="px-6 py-4 text-center text-blue-700 font-black bg-blue-50/30">{r.avgK}</td>
+                                            <td className="px-6 py-4 text-center text-emerald-700 font-black bg-emerald-50/30">{r.avgP}</td>
+                                            <td className="px-6 py-4 text-center text-orange-700 font-black bg-orange-50/30">{r.avgA}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
