@@ -235,7 +235,6 @@
             const [studentName, setStudentName] = useState('');
             const [isImporting, setIsImporting] = useState(false);
             
-            // Otomatis urutkan secara alfabetis A-Z
             const filteredStudents = students
                 .filter(s => s.classId === selectedClass)
                 .sort((a, b) => a.name.localeCompare(b.name));
@@ -253,24 +252,17 @@
                         const workbook = XLSX.read(binaryStr, { type: 'binary' });
                         const sheetName = workbook.SheetNames[0];
                         const sheet = workbook.Sheets[sheetName];
-                        
-                        // Gunakan header: 1 untuk membaca data mentah baris demi baris (tanpa label kolom)
                         const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                        
                         const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students');
                         
-                        let count = 0;
                         for (const row of json) {
-                            // Ambil data dari kolom pertama (index 0)
                             const name = row[0];
-                            
                             if (name && String(name).trim() !== '') {
                                 await window.fbUtils.addDoc(col, { 
                                     name: String(name).trim(), 
                                     classId: selectedClass,
                                     importedAt: new Date().toISOString()
                                 });
-                                count++;
                             }
                         }
                     } catch (error) { 
@@ -281,12 +273,6 @@
                         e.target.value = '';
                     }
                 };
-                
-                reader.onerror = () => {
-                    setIsImporting(false);
-                    alert("Gagal membaca file.");
-                };
-                
                 reader.readAsBinaryString(file);
             };
 
@@ -324,7 +310,7 @@
                         </div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                             <h3 className="font-bold mb-2">Impor Excel (.xlsx)</h3>
-                            <p className="text-[10px] text-slate-500 mb-3">Pilih kelas dahulu. Sistem mengambil data dari kolom pertama (Baris 1 langsung isi Nama).</p>
+                            <p className="text-[10px] text-slate-500 mb-3">Pilih kelas dahulu. Baris 1 langsung isi Nama.</p>
                             <div className="relative">
                                 <input 
                                     type="file" 
@@ -375,7 +361,6 @@
         const ScoreInput = ({ classes, students, selectedClass, setSelectedClass, selectedSubject, setSelectedSubject, meetingName, setMeetingName, user, setActiveTab }) => {
             const [localScores, setLocalScores] = useState({});
             
-            // Otomatis urutkan secara alfabetis A-Z untuk mempermudah input nilai
             const filteredStudents = students
                 .filter(s => s.classId === selectedClass)
                 .sort((a, b) => a.name.localeCompare(b.name));
@@ -417,7 +402,7 @@
                     ...prev,
                     [studentId]: {
                         ...(prev[studentId] || { studentId, kog: 0, psi: 0, afe: 0 }),
-                        [field]: val
+                        [field]: parseFloat(val) || 0
                     }
                 }));
             };
@@ -463,10 +448,20 @@
 
         const ReportSummary = ({ scores, students, classes }) => {
             const [filter, setFilter] = useState('');
+
+            // Fungsi hitung nilai akhir
+            const calculateFinal = (s) => {
+                const final = (s.kog * 0.4) + (s.psi * 0.3) + (s.afe * 0.3);
+                return final.toFixed(2);
+            };
+
             return (
                 <div className="bg-white rounded-2xl shadow-sm overflow-hidden fade-in">
                     <div className="p-6 bg-slate-50 border-b flex flex-col md:flex-row justify-between items-center gap-4">
-                        <h3 className="font-black text-slate-800">Riwayat Penilaian</h3>
+                        <div>
+                            <h3 className="font-black text-slate-800">Riwayat Penilaian</h3>
+                            <p className="text-[10px] text-slate-400 mt-1 font-bold italic">Bobot: 40% K, 30% P, 30% A</p>
+                        </div>
                         <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-slate-400">Filter Kelas:</span>
                             <select onChange={e => setFilter(e.target.value)} className="border p-2 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
@@ -482,9 +477,10 @@
                                     <th className="p-4">Siswa</th>
                                     <th className="p-4">Kelas</th>
                                     <th className="p-4">Mata Pelajaran</th>
-                                    <th className="p-4 text-center">K</th>
-                                    <th className="p-4 text-center">P</th>
-                                    <th className="p-4 text-center">A</th>
+                                    <th className="p-4 text-center">K (40%)</th>
+                                    <th className="p-4 text-center">P (30%)</th>
+                                    <th className="p-4 text-center">A (30%)</th>
+                                    <th className="p-4 text-center bg-blue-50 text-blue-700">Nilai Akhir</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -493,9 +489,10 @@
                                         <td className="p-4 font-semibold text-slate-700">{students.find(st => st.id === s.studentId)?.name || 'N/A'}</td>
                                         <td className="p-4"><span className="px-2 py-1 bg-slate-100 rounded-md text-[10px] font-bold text-slate-600 uppercase">{classes.find(c => c.id === s.classId)?.name || '-'}</span></td>
                                         <td className="p-4 text-slate-500">{s.subject} <span className="text-[10px] bg-blue-50 text-blue-600 px-1 rounded">{s.meeting}</span></td>
-                                        <td className="p-4 text-center font-mono text-blue-600 font-bold">{s.kog}</td>
-                                        <td className="p-4 text-center font-mono text-emerald-600 font-bold">{s.psi}</td>
-                                        <td className="p-4 text-center font-mono text-purple-600 font-bold">{s.afe}</td>
+                                        <td className="p-4 text-center font-mono text-slate-500">{s.kog}</td>
+                                        <td className="p-4 text-center font-mono text-slate-500">{s.psi}</td>
+                                        <td className="p-4 text-center font-mono text-slate-500">{s.afe}</td>
+                                        <td className="p-4 text-center font-mono font-black text-blue-700 bg-blue-50/50">{calculateFinal(s)}</td>
                                     </tr>
                                 ))}
                             </tbody>
