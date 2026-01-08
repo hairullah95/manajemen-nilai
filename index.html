@@ -232,7 +232,7 @@
 
         const StudentManager = ({ classes, students, selectedClass, setSelectedClass, user }) => {
             const [className, setClassName] = useState('');
-            const [studentForm, setStudentForm] = useState({ nis: '', name: '' });
+            const [studentName, setStudentName] = useState('');
             const [isImporting, setIsImporting] = useState(false);
             const filteredStudents = students.filter(s => s.classId === selectedClass);
 
@@ -255,13 +255,11 @@
                         
                         let count = 0;
                         for (const row of json) {
-                            // Deteksi kolom secara dinamis (Nama atau Name, NIS atau nis)
-                            const nis = row.NIS || row.nis || row.Nis || '';
+                            // Mencari kolom Nama secara dinamis
                             const name = row.Nama || row.nama || row.Name || row.name || row['Nama Siswa'] || '';
                             
                             if (name) {
                                 await window.fbUtils.addDoc(col, { 
-                                    nis: String(nis), 
                                     name: String(name), 
                                     classId: selectedClass,
                                     importedAt: new Date().toISOString()
@@ -269,13 +267,12 @@
                                 count++;
                             }
                         }
-                        console.log(`Berhasil mengimpor ${count} siswa`);
                     } catch (error) { 
                         console.error("Gagal impor:", error);
-                        alert("Gagal membaca file Excel. Pastikan format benar.");
+                        alert("Gagal membaca file Excel. Pastikan terdapat kolom 'Nama'.");
                     } finally { 
                         setIsImporting(false); 
-                        e.target.value = ''; // Reset input
+                        e.target.value = '';
                     }
                 };
                 
@@ -295,10 +292,10 @@
             };
 
             const addStudent = async () => {
-                if (!studentForm.name || !selectedClass || !user) return;
+                if (!studentName || !selectedClass || !user) return;
                 const col = window.fbUtils.collection(window.fbDb, 'artifacts', 'manajemen-nilai-siswa', 'users', user.uid, 'students');
-                await window.fbUtils.addDoc(col, { ...studentForm, classId: selectedClass });
-                setStudentForm({ nis: '', name: '' });
+                await window.fbUtils.addDoc(col, { name: studentName, classId: selectedClass });
+                setStudentName('');
             };
 
             return (
@@ -307,7 +304,7 @@
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                             <h3 className="font-bold mb-4 flex items-center gap-2">Kelola Kelas</h3>
                             <div className="flex gap-2">
-                                <input value={className} onChange={e => setClassName(e.target.value)} placeholder="Nama Kelas (Contoh: 10 IPA 1)" className="flex-1 border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
+                                <input value={className} onChange={e => setClassName(e.target.value)} placeholder="Nama Kelas" className="flex-1 border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
                                 <button onClick={addClass} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"><Icon name="plus"/></button>
                             </div>
                             <div className="mt-4 space-y-1">
@@ -321,7 +318,7 @@
                         </div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                             <h3 className="font-bold mb-2">Impor Excel (.xlsx)</h3>
-                            <p className="text-[10px] text-slate-500 mb-3">Pilih kelas terlebih dahulu. Gunakan kolom "Nama" dan "NIS".</p>
+                            <p className="text-[10px] text-slate-500 mb-3">Pilih kelas dahulu. Gunakan kolom "Nama".</p>
                             <div className="relative">
                                 <input 
                                     type="file" 
@@ -331,25 +328,24 @@
                                     className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                             </div>
-                            {isImporting && <div className="mt-3 flex items-center gap-2 text-blue-600 text-xs font-medium animate-pulse"><Icon name="loader" size={14} className="animate-spin" /> Sedang mengimpor data...</div>}
+                            {isImporting && <div className="mt-3 flex items-center gap-2 text-blue-600 text-xs font-medium animate-pulse"><Icon name="loader" size={14} className="animate-spin" /> Sedang mengimpor...</div>}
                         </div>
                     </div>
                     <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-bold">Daftar Siswa {selectedClass && `(${classes.find(c => c.id === selectedClass)?.name})`}</h3>
                             <div className="flex gap-2">
-                                <input value={studentForm.nis} onChange={e => setStudentForm({...studentForm, nis: e.target.value})} placeholder="NIS" className="border p-2 rounded-lg text-sm w-24 outline-none focus:ring-2 focus:ring-blue-500"/>
-                                <input value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} placeholder="Nama Lengkap" className="border p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"/>
+                                <input value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="Nama Lengkap" className="border p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 flex-1"/>
                                 <button onClick={addStudent} disabled={!selectedClass} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50">Tambah</button>
                             </div>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 rounded-tl-xl">NIS</th><th className="p-4">Nama</th><th className="p-4 text-right rounded-tr-xl">Aksi</th></tr></thead>
+                                <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 rounded-tl-xl">No</th><th className="p-4">Nama</th><th className="p-4 text-right rounded-tr-xl">Aksi</th></tr></thead>
                                 <tbody className="divide-y">
-                                    {filteredStudents.length > 0 ? filteredStudents.map(s => (
+                                    {filteredStudents.length > 0 ? filteredStudents.map((s, idx) => (
                                         <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4 text-slate-500 font-mono">{s.nis || '-'}</td>
+                                            <td className="p-4 text-slate-400 font-mono w-16">{idx + 1}</td>
                                             <td className="p-4 font-semibold text-slate-700">{s.name}</td>
                                             <td className="p-4 text-right">
                                                 <button onClick={async () => {
@@ -402,7 +398,7 @@
                     setActiveTab('rekap');
                 } catch (err) {
                     console.error(err);
-                    alert("Gagal menyimpan data ke server.");
+                    alert("Gagal menyimpan data.");
                 }
             };
 
@@ -435,14 +431,14 @@
                     
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
-                            <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 text-left">Nama Siswa</th><th className="p-4 text-center">Kognitif (K)</th><th className="p-4 text-center">Psikomotor (P)</th><th className="p-4 text-center">Afektif (A)</th></tr></thead>
+                            <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4 text-left">Nama Siswa</th><th className="p-4 text-center w-32">Kognitif</th><th className="p-4 text-center w-32">Psikomotor</th><th className="p-4 text-center w-32">Afektif</th></tr></thead>
                             <tbody>
                                 {filteredStudents.map(s => (
                                     <tr key={s.id} className="border-b hover:bg-slate-50 transition-colors">
                                         <td className="p-4 font-medium text-slate-700">{s.name}</td>
-                                        <td className="p-4 text-center"><input type="number" onChange={e => updateLocal(s.id, 'kog', e.target.value)} className="w-20 border p-2 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none"/></td>
-                                        <td className="p-4 text-center"><input type="number" onChange={e => updateLocal(s.id, 'psi', e.target.value)} className="w-20 border p-2 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none"/></td>
-                                        <td className="p-4 text-center"><input type="number" onChange={e => updateLocal(s.id, 'afe', e.target.value)} className="w-20 border p-2 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none"/></td>
+                                        <td className="p-4 text-center"><input type="number" onChange={e => updateLocal(s.id, 'kog', e.target.value)} className="w-full border p-2 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0"/></td>
+                                        <td className="p-4 text-center"><input type="number" onChange={e => updateLocal(s.id, 'psi', e.target.value)} className="w-full border p-2 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0"/></td>
+                                        <td className="p-4 text-center"><input type="number" onChange={e => updateLocal(s.id, 'afe', e.target.value)} className="w-full border p-2 rounded-lg text-center focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0"/></td>
                                     </tr>
                                 ))}
                             </tbody>
