@@ -24,121 +24,248 @@
 <body class="bg-slate-50">
     <div id="root"></div>
 
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlXDVBSJryVlGwtZWYL_BNnh6-7R-SbXk",
+            authDomain: "jurnal-guru-f06df.firebaseapp.com",
+            projectId: "jurnal-guru-f06df",
+            storageBucket: "jurnal-guru-f06df.firebasestorage.app",
+            messagingSenderId: "782875410114",
+            appId: "1:782875410114:web:702b8b802901b71d16055b",
+            measurementId: "G-9LCGMFSPMM"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        // Export to window for React component access
+        window.fbAuth = auth;
+        window.fbDb = db;
+        window.fbProvider = provider;
+        window.fbUtils = { signInWithPopup, signOut, onAuthStateChanged, collection, query, onSnapshot, doc, setDoc, addDoc, deleteDoc };
+    </script>
+
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // Firebase Mock & Config (Global environment variables)
-        const firebaseConfig = JSON.parse(__firebase_config || "{}");
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'manajemen-nilai-siswa';
-
-        // Core Components & Icons (Using SVG for reliability in single HTML)
         const Icon = ({ name, size = 20, className = "" }) => {
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
         const App = () => {
+            const [user, setUser] = useState(null);
+            const [authLoading, setAuthLoading] = useState(true);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [classes, setClasses] = useState([]);
             const [students, setStudents] = useState([]);
             const [scores, setScores] = useState([]);
-            const [loading, setLoading] = useState(false);
             const [selectedClass, setSelectedClass] = useState('');
             const [selectedSubject, setSelectedSubject] = useState('');
             const [meetingName, setMeetingName] = useState('');
 
+            // --- Auth Listener ---
             useEffect(() => {
-                // Initialize Lucide icons after render
-                lucide.createIcons();
-            }, [activeTab, classes, students]);
+                const unsubscribe = window.fbUtils.onAuthStateChanged(window.fbAuth, (currentUser) => {
+                    setUser(currentUser);
+                    setAuthLoading(false);
+                    if (currentUser) {
+                        loadInitialData(currentUser.uid);
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
 
-            // --- Handlers ---
-            const handleAddClass = (name) => {
-                if (!name) return;
-                const newClass = { id: Date.now().toString(), name };
-                setClasses([...classes, newClass]);
+            // --- Data Fetching (Real-time) ---
+            const loadInitialData = (uid) => {
+                const appId = 'manajemen-nilai-siswa';
+                
+                // Path Rule: /artifacts/{appId}/users/{userId}/{collectionName}
+                const classesRef = window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', uid, 'classes');
+                const studentsRef = window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', uid, 'students');
+                const scoresRef = window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', uid, 'scores');
+
+                window.fbUtils.onSnapshot(classesRef, (snap) => {
+                    setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                });
+                window.fbUtils.onSnapshot(studentsRef, (snap) => {
+                    setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                });
+                window.fbUtils.onSnapshot(scoresRef, (snap) => {
+                    setScores(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                });
             };
 
-            const handleDeleteClass = (id) => {
-                setClasses(classes.filter(c => c.id !== id));
+            useEffect(() => {
+                lucide.createIcons();
+            }, [activeTab, user, classes, students]);
+
+            // --- Handlers ---
+            const handleLogin = async () => {
+                try {
+                    await window.fbUtils.signInWithPopup(window.fbAuth, window.fbProvider);
+                } catch (error) {
+                    console.error("Login failed", error);
+                }
+            };
+
+            const handleLogout = () => window.fbUtils.signOut(window.fbAuth);
+
+            const handleAddClass = async (name) => {
+                if (!name || !user) return;
+                const appId = 'manajemen-nilai-siswa';
+                await window.fbUtils.addDoc(
+                    window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', user.uid, 'classes'),
+                    { name, createdAt: new Date().toISOString() }
+                );
+            };
+
+            const handleDeleteClass = async (id) => {
+                const appId = 'manajemen-nilai-siswa';
+                await window.fbUtils.deleteDoc(window.fbUtils.doc(window.fbDb, 'artifacts', appId, 'users', user.uid, 'classes', id));
                 if (selectedClass === id) setSelectedClass('');
             };
 
-            const handleAddStudent = (student) => {
-                setStudents([...students, { ...student, id: Date.now().toString() }]);
+            const handleAddStudent = async (student) => {
+                if (!user) return;
+                const appId = 'manajemen-nilai-siswa';
+                await window.fbUtils.addDoc(
+                    window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', user.uid, 'students'),
+                    { ...student, createdAt: new Date().toISOString() }
+                );
+            };
+
+            const handleSaveScores = async (newScores) => {
+                if (!user) return;
+                const appId = 'manajemen-nilai-siswa';
+                const scoresCol = window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', user.uid, 'scores');
+                
+                for (const s of newScores) {
+                    await window.fbUtils.addDoc(scoresCol, {
+                        ...s,
+                        classId: selectedClass,
+                        subject: selectedSubject,
+                        meeting: meetingName,
+                        createdAt: new Date().toISOString()
+                    });
+                }
+                setActiveTab('rekap');
             };
 
             const handleExcelImport = (e) => {
                 const file = e.target.files[0];
-                if (!file || !selectedClass) return;
+                if (!file || !selectedClass || !user) return;
                 const reader = new FileReader();
-                reader.onload = (evt) => {
+                reader.onload = async (evt) => {
                     const text = evt.target.result;
                     const rows = text.split('\n').slice(1);
-                    const newStudents = rows.map(row => {
+                    const appId = 'manajemen-nilai-siswa';
+                    const colRef = window.fbUtils.collection(window.fbDb, 'artifacts', appId, 'users', user.uid, 'students');
+                    
+                    for (const row of rows) {
                         const [nis, name] = row.split(',');
-                        if (name) return { id: Math.random().toString(), nis: nis.trim(), name: name.trim(), classId: selectedClass };
-                        return null;
-                    }).filter(Boolean);
-                    setStudents([...students, ...newStudents]);
+                        if (name) {
+                            await window.fbUtils.addDoc(colRef, {
+                                nis: nis.trim(),
+                                name: name.trim(),
+                                classId: selectedClass
+                            });
+                        }
+                    }
                 };
                 reader.readAsText(file);
             };
 
-            const handleSaveScores = (newScores) => {
-                const prepared = newScores.map(s => ({
-                    ...s,
-                    id: Date.now() + Math.random(),
-                    classId: selectedClass,
-                    subject: selectedSubject,
-                    meeting: meetingName
-                }));
-                setScores([...scores, ...prepared]);
-                setActiveTab('rekap');
-            };
-
-            // --- UI Components ---
-            const Sidebar = () => (
-                <div className="w-64 bg-slate-900 text-white h-screen fixed left-0 top-0 p-4 flex flex-col">
-                    <div className="text-2xl font-bold flex items-center gap-2 mb-10 px-2">
-                        <div className="p-2 bg-blue-600 rounded-lg">
-                            <Icon name="book-open" size={24} />
-                        </div>
-                        <span>E-Raport</span>
+            if (authLoading) {
+                return (
+                    <div className="h-screen flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                     </div>
-                    <nav className="flex-1 space-y-2">
-                        {[
-                            { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
-                            { id: 'data-siswa', label: 'Data Siswa', icon: 'users' },
-                            { id: 'input-nilai', label: 'Input Nilai', icon: 'clipboard-check' },
-                            { id: 'rekap', label: 'Rekap Nilai', icon: 'file-text' },
-                        ].map((item) => (
-                            <button
-                                key={item.id}
-                                onClick={() => setActiveTab(item.id)}
-                                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${
-                                    activeTab === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-slate-800 text-slate-400'
-                                }`}
+                );
+            }
+
+            if (!user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+                        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10 text-center space-y-6">
+                            <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-blue-200">
+                                <Icon name="book-open" size={40} className="text-white"/>
+                            </div>
+                            <div className="space-y-2">
+                                <h1 className="text-3xl font-black text-slate-800 tracking-tight">E-Raport</h1>
+                                <p className="text-slate-500">Sistem Manajemen Nilai Siswa Terpusat</p>
+                            </div>
+                            <button 
+                                onClick={handleLogin}
+                                className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 py-4 rounded-2xl font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
                             >
-                                <Icon name={item.icon} size={20} />
-                                <span className="font-medium">{item.label}</span>
+                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google"/>
+                                Masuk dengan Google
                             </button>
-                        ))}
-                    </nav>
-                </div>
-            );
+                            <p className="text-xs text-slate-400">Data tersimpan otomatis di akun Google Anda</p>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div className="min-h-screen bg-slate-50">
-                    <Sidebar />
+                    {/* Sidebar */}
+                    <div className="w-64 bg-slate-900 text-white h-screen fixed left-0 top-0 p-4 flex flex-col">
+                        <div className="text-2xl font-bold flex items-center gap-2 mb-10 px-2">
+                            <div className="p-2 bg-blue-600 rounded-lg">
+                                <Icon name="book-open" size={24} />
+                            </div>
+                            <span>E-Raport</span>
+                        </div>
+                        <nav className="flex-1 space-y-2">
+                            {[
+                                { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+                                { id: 'data-siswa', label: 'Data Siswa', icon: 'users' },
+                                { id: 'input-nilai', label: 'Input Nilai', icon: 'clipboard-check' },
+                                { id: 'rekap', label: 'Rekap Nilai', icon: 'file-text' },
+                            ].map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActiveTab(item.id)}
+                                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${
+                                        activeTab === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-slate-800 text-slate-400'
+                                    }`}
+                                >
+                                    <Icon name={item.icon} size={20} />
+                                    <span className="font-medium">{item.label}</span>
+                                </button>
+                            ))}
+                        </nav>
+                        <div className="pt-4 border-t border-slate-800">
+                            <div className="flex items-center gap-3 p-2 mb-4">
+                                <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-blue-500" alt="Avatar"/>
+                                <div className="overflow-hidden">
+                                    <p className="text-sm font-bold truncate">{user.displayName}</p>
+                                    <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+                                </div>
+                            </div>
+                            <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors font-bold text-sm">
+                                <Icon name="log-out" size={18} /> Keluar
+                            </button>
+                        </div>
+                    </div>
+
                     <main className="ml-64 p-8">
                         <header className="flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-800 capitalize">{activeTab.replace('-', ' ')}</h1>
-                                <p className="text-slate-500 text-sm">Manajemen Akademik Real-time</p>
+                                <p className="text-slate-500 text-sm">Akun: {user.displayName}</p>
                             </div>
                             <div className="flex items-center gap-3 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 text-xs font-bold">
                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                SISTEM ONLINE
+                                CLOUD SYNC AKTIF
                             </div>
                         </header>
 
@@ -153,7 +280,7 @@
                                 onDeleteClass={handleDeleteClass}
                                 onAddStudent={handleAddStudent}
                                 onImport={handleExcelImport}
-                                setStudents={setStudents}
+                                user={user}
                             />
                         )}
                         {activeTab === 'input-nilai' && (
@@ -181,8 +308,6 @@
             );
         };
 
-        // --- SUB-COMPONENTS ---
-
         const DashboardStats = ({ classes, students, scores, setActiveTab }) => (
             <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -200,8 +325,8 @@
                     </div>
                 </div>
                 <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-10 text-white shadow-xl">
-                    <h2 className="text-3xl font-bold mb-4">Selamat Datang di Portal Nilai</h2>
-                    <p className="text-blue-100 max-w-xl mb-8 leading-relaxed">Kelola data akademik sekolah Anda dengan mudah. Mulai dari manajemen kelas, input nilai harian, hingga rekapitulasi otomatis.</p>
+                    <h2 className="text-3xl font-bold mb-4">E-Raport Cloud Ready</h2>
+                    <p className="text-blue-100 max-w-xl mb-8 leading-relaxed">Semua data Anda sekarang tersinkronisasi secara otomatis ke Google Cloud. Anda bisa melanjutkan pekerjaan di mana saja.</p>
                     <div className="flex gap-4">
                         <button onClick={() => setActiveTab('data-siswa')} className="bg-white text-blue-700 px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition-colors">Kelola Siswa</button>
                         <button onClick={() => setActiveTab('input-nilai')} className="bg-blue-500/30 backdrop-blur-md text-white border border-blue-400 px-6 py-3 rounded-xl font-bold hover:bg-blue-500/50 transition-colors">Input Nilai</button>
@@ -210,7 +335,7 @@
             </div>
         );
 
-        const StudentManager = ({ classes, students, selectedClass, setSelectedClass, onAddClass, onDeleteClass, onAddStudent, onImport, setStudents }) => {
+        const StudentManager = ({ classes, students, selectedClass, setSelectedClass, onAddClass, onDeleteClass, onAddStudent, onImport, user }) => {
             const [className, setClassName] = useState('');
             const [studentForm, setStudentForm] = useState({ nis: '', name: '' });
             const filteredStudents = students.filter(s => s.classId === selectedClass);
@@ -270,7 +395,14 @@
                                                     <td className="px-6 py-4 text-sm text-slate-600">{s.nis}</td>
                                                     <td className="px-6 py-4 text-sm font-semibold text-slate-800">{s.name}</td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <button onClick={() => setStudents(students.filter(std => std.id !== s.id))} className="text-red-400 hover:text-red-600 transition-colors"><Icon name="user-minus" size={18}/></button>
+                                                        <button 
+                                                            onClick={async () => {
+                                                                const appId = 'manajemen-nilai-siswa';
+                                                                await window.fbUtils.deleteDoc(window.fbUtils.doc(window.fbDb, 'artifacts', appId, 'users', user.uid, 'students', s.id));
+                                                            }} 
+                                                            className="text-red-400 hover:text-red-600 transition-colors">
+                                                            <Icon name="user-minus" size={18}/>
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             )) : (
