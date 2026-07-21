@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>E-Raport Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfcfd; margin: 0; padding: 0; }
@@ -108,7 +108,6 @@
                 };
             }, []);
 
-            // Set user berdasarkan kode akses yang diinput
             useEffect(() => {
                 if (!fbReady || !accessCode) return;
                 setUser({ uid: accessCode.trim().toLowerCase() });
@@ -137,6 +136,10 @@
                 return () => { unsubClasses(); unsubStudents(); unsubScores(); };
             }, [user, fbReady]);
 
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+
             const handleLogin = (e) => {
                 e.preventDefault();
                 if (!tempCode.trim()) return alert('Masukkan Kode Akses terlebih dahulu!');
@@ -164,7 +167,6 @@
                 </div>
             );
 
-            // Tampilan Halaman Login / Kode Akses
             if (!accessCode) {
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
@@ -210,7 +212,6 @@
 
             return (
                 <div className="flex flex-col md:flex-row min-h-screen bg-[#fcfcfd]">
-                    {/* Mobile Header Bar */}
                     <div className="md:hidden flex items-center justify-between bg-white border-b border-gray-100 p-4 sticky top-0 z-30">
                         <div className="flex items-center gap-3 text-blue-600">
                             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md">
@@ -223,12 +224,10 @@
                         </button>
                     </div>
 
-                    {/* Backdrop for Mobile Sidebar */}
                     {isSidebarOpen && (
                         <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/20 z-40 md:hidden backdrop-blur-sm"></div>
                     )}
 
-                    {/* Sidebar / Navigasi Kiri */}
                     <aside className={`fixed md:static inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-100 flex flex-col p-6 md:p-8 space-y-8 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3 text-blue-600">
@@ -271,7 +270,6 @@
                         </div>
                     </aside>
 
-                    {/* Main Content */}
                     <main className="flex-1 overflow-y-auto h-screen custom-scroll">
                         <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-12 pb-24 md:pb-12">
                             {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
@@ -284,66 +282,51 @@
             );
         };
 
-        const Dashboard = ({ classes, students, scores }) => {
-            useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
-            return (
-                <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Selamat Datang, Guru!</h1>
-                        <p className="text-gray-400 mt-1 md:mt-2 text-sm md:text-base font-medium">Berikut adalah rangkuman data penilaian Anda hari ini.</p>
-                    </div>
+        const Dashboard = ({ classes, students, scores }) => (
+            <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Selamat Datang, Guru!</h1>
+                    <p className="text-gray-400 mt-1 md:mt-2 text-sm md:text-base font-medium">Berikut adalah rangkuman data penilaian Anda hari ini.</p>
+                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
-                        <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
-                            <div className="w-12 h-12 md:w-14 md:h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><i data-lucide="grid"></i></div>
-                            <div>
-                                <h2 className="text-3xl md:text-4xl font-black text-gray-900">{classes.length}</h2>
-                                <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest">Total Kelas</p>
-                            </div>
-                        </div>
-                        <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
-                            <div className="w-12 h-12 md:w-14 md:h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><i data-lucide="users"></i></div>
-                            <div>
-                                <h2 className="text-3xl md:text-4xl font-black text-gray-900">{students.length}</h2>
-                                <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest">Siswa Terdaftar</p>
-                            </div>
-                        </div>
-                        <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
-                            <div className="w-12 h-12 md:w-14 md:h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><i data-lucide="database"></i></div>
-                            <div>
-                                <h2 className="text-3xl md:text-4xl font-black text-gray-900">{scores.length}</h2>
-                                <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest">Entri Nilai</p>
-                            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
+                    <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
+                        <div className="w-12 h-12 md:w-14 md:h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><i data-lucide="grid"></i></div>
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-black text-gray-900">{classes.length}</h2>
+                            <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest">Total Kelas</p>
                         </div>
                     </div>
-
-                    <div className="glass-card p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-none shadow-sm">
-                        <div className="flex items-center gap-4 mb-4 md:mb-6">
-                            <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><i data-lucide="info" className="w-5 h-5"></i></div>
-                            <h3 className="text-lg md:text-xl font-bold">Panduan Singkat</h3>
+                    <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
+                        <div className="w-12 h-12 md:w-14 md:h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><i data-lucide="users"></i></div>
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-black text-gray-900">{students.length}</h2>
+                            <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest">Siswa Terdaftar</p>
                         </div>
-                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 text-gray-500 font-medium text-sm md:text-base">
-                            <li className="flex gap-3">
-                                <span className="text-blue-600 font-black">1.</span>
-                                Daftarkan kelas Anda atau impor siswa secara massal menggunakan file Excel (.xlsx).
-                            </li>
-                            <li className="flex gap-3">
-                                <span className="text-blue-600 font-black">2.</span>
-                                Gunakan menu Input Nilai untuk mencatat hasil belajar harian siswa.
-                            </li>
-                            <li className="flex gap-3">
-                                <span className="text-blue-600 font-black">3.</span>
-                                Lihat rekapitulasi lengkap nilai secara real-time pada menu Rekap & Ekspor.
-                            </li>
-                            <li className="flex gap-3">
-                                <span className="text-blue-600 font-black">4.</span>
-                                Unduh hasil rekap ke Excel untuk keperluan administrasi rapot.
-                            </li>
-                        </ul>
+                    </div>
+                    <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
+                        <div className="w-12 h-12 md:w-14 md:h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><i data-lucide="database"></i></div>
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-black text-gray-900">{scores.length}</h2>
+                            <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest">Entri Nilai</p>
+                        </div>
                     </div>
                 </div>
-            );
-        };
+
+                <div className="glass-card p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-none shadow-sm">
+                    <div className="flex items-center gap-4 mb-4 md:mb-6">
+                        <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><i data-lucide="info" className="w-5 h-5"></i></div>
+                        <h3 className="text-lg md:text-xl font-bold">Panduan Singkat</h3>
+                    </div>
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 text-gray-500 font-medium text-sm md:text-base">
+                        <li className="flex gap-3"><span className="text-blue-600 font-black">1.</span> Daftarkan kelas Anda atau impor siswa secara massal menggunakan file Excel (.xlsx).</li>
+                        <li className="flex gap-3"><span className="text-blue-600 font-black">2.</span> Gunakan menu Input Nilai untuk mencatat hasil belajar harian siswa.</li>
+                        <li className="flex gap-3"><span className="text-blue-600 font-black">3.</span> Lihat rekapitulasi lengkap nilai secara real-time pada menu Rekap & Ekspor.</li>
+                        <li className="flex gap-3"><span className="text-blue-600 font-black">4.</span> Unduh hasil rekap ke Excel untuk keperluan administrasi rapot.</li>
+                    </ul>
+                </div>
+            </div>
+        );
 
         const ManajemenData = ({ classes, students, user, appId }) => {
             const [newClass, setNewClass] = useState('');
@@ -351,8 +334,6 @@
             const [selectedClassId, setSelectedClassId] = useState('');
             const [importClassId, setImportClassId] = useState('');
             const [uploading, setUploading] = useState(false);
-
-            useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
             const addClass = async () => {
                 if (!newClass || !user) return;
@@ -429,7 +410,6 @@
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Manajemen Data</h1>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-                        {/* Box Kelas */}
                         <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-none shadow-sm space-y-6">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-lg md:text-xl font-bold">Daftar Kelas</h3>
@@ -449,7 +429,6 @@
                             </div>
                         </div>
 
-                        {/* Box Input Siswa Manual */}
                         <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-none shadow-sm space-y-6">
                             <h3 className="text-lg md:text-xl font-bold">Tambah Siswa Satuan</h3>
                             <div className="space-y-4">
@@ -468,7 +447,6 @@
                             </div>
                         </div>
 
-                        {/* Box Impor Excel */}
                         <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-none shadow-sm space-y-6 bg-gradient-to-br from-blue-50/50 to-indigo-50/50">
                             <h3 className="text-lg md:text-xl font-bold text-blue-900">Impor Excel Siswa</h3>
                             <div className="space-y-4">
@@ -490,7 +468,6 @@
                         </div>
                     </div>
 
-                    {/* Tabel Siswa */}
                     <div className="glass-card p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-none shadow-sm space-y-6">
                         <h3 className="text-xl md:text-2xl font-bold">Daftar Seluruh Siswa ({students.length})</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto custom-scroll p-1">
@@ -518,8 +495,6 @@
             const [meetingName, setMeetingName] = useState('');
             const [inputData, setInputData] = useState({});
             const [bulkVal, setBulkVal] = useState('');
-
-            useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
             const filteredStudents = useMemo(() => students.filter(s => s.classId === selClass), [students, selClass]);
 
@@ -626,8 +601,6 @@
 
         const RekapNilai = ({ classes, students, scores }) => {
             const [selClass, setSelClass] = useState('');
-
-            useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
             const meetingTypes = useMemo(() => {
                 const filteredScores = selClass ? scores.filter(sc => sc.classId === selClass) : scores;
