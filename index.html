@@ -15,7 +15,7 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfcfd; margin: 0; padding: 0; }
         .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(229, 231, 235, 0.5); }
         .sidebar-active { background: #2563eb; color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb { background-color: #e5e7eb; border-radius: 10px; }
     </style>
 </head>
@@ -28,7 +28,6 @@
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, deleteDoc, updateDoc, where, getDocs } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
-        // Konfigurasi Firebase dari User
         const firebaseConfig = {
             apiKey: "AIzaSyAlXDVBSJryVlGwtZWYL_BNnh6-7R-SbXk",
             authDomain: "jurnal-guru-f06df.firebaseapp.com",
@@ -45,7 +44,6 @@
                 const auth = getAuth(app);
                 const db = getFirestore(app);
 
-                // Bridge global untuk React agar bisa diakses di script type="text/babel"
                 window.fb = { 
                     auth, 
                     db, 
@@ -88,7 +86,6 @@
             const [scores, setScores] = useState([]);
             const [loading, setLoading] = useState(true);
             
-            // App ID tetap untuk memisahkan data di Firestore
             const appId = "eraport-pro-v1";
 
             useEffect(() => {
@@ -113,7 +110,6 @@
 
                 const initAuth = async () => {
                     try {
-                        // Menggunakan Anonymous Sign-in sebagai default agar user tidak perlu login manual
                         await window.fb.methods.signInAnonymously(window.fb.auth);
                     } catch (err) {
                         console.error("Auth error:", err);
@@ -134,7 +130,6 @@
             useEffect(() => {
                 if (!user || !fbReady) return;
 
-                // Listener Firestore dengan path yang sesuai aturan keamanan (Rule 1)
                 const unsubClasses = window.fb.methods.onSnapshot(
                     window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes'),
                     (snap) => setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
@@ -191,7 +186,7 @@
                                 { id: 'dashboard', label: 'Ringkasan', icon: 'layout' },
                                 { id: 'manajemen', label: 'Data Siswa', icon: 'users' },
                                 { id: 'input', label: 'Input Nilai', icon: 'edit-3' },
-                                { id: 'ekspor', label: 'Ekspor Rekap', icon: 'file-text' }
+                                { id: 'rekap', label: 'Rekap & Ekspor', icon: 'file-text' }
                             ].map(item => (
                                 <button 
                                     key={item.id} 
@@ -219,7 +214,7 @@
                             {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
                             {activeTab === 'manajemen' && <ManajemenData classes={classes} students={students} user={user} appId={appId} />}
                             {activeTab === 'input' && <InputNilai classes={classes} students={students} user={user} appId={appId} />}
-                            {activeTab === 'ekspor' && <EksporHasil classes={classes} students={students} scores={scores} />}
+                            {activeTab === 'rekap' && <RekapNilai classes={classes} students={students} scores={scores} />}
                         </div>
                     </main>
                 </div>
@@ -267,19 +262,19 @@
                         <ul className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-500 font-medium">
                             <li className="flex gap-3">
                                 <span className="text-blue-600 font-black">1.</span>
-                                Daftarkan kelas Anda terlebih dahulu di menu Data Siswa.
+                                Daftarkan kelas Anda atau impor siswa secara massal menggunakan file Excel (.xlsx).
                             </li>
                             <li className="flex gap-3">
                                 <span className="text-blue-600 font-black">2.</span>
-                                Tambahkan siswa ke dalam kelas yang sudah dibuat.
+                                Gunakan menu Input Nilai untuk mencatat hasil belajar harian siswa.
                             </li>
                             <li className="flex gap-3">
                                 <span className="text-blue-600 font-black">3.</span>
-                                Gunakan menu Input Nilai untuk mencatat hasil belajar harian.
+                                Lihat rekapitulasi lengkap nilai secara real-time pada menu Rekap & Ekspor.
                             </li>
                             <li className="flex gap-3">
                                 <span className="text-blue-600 font-black">4.</span>
-                                Ekspor hasil nilai ke Excel untuk keperluan administrasi rapot.
+                                Unduh hasil rekap ke Excel untuk keperluan administrasi rapot.
                             </li>
                         </ul>
                     </div>
@@ -291,6 +286,8 @@
             const [newClass, setNewClass] = useState('');
             const [studentName, setStudentName] = useState('');
             const [selectedClassId, setSelectedClassId] = useState('');
+            const [importClassId, setImportClassId] = useState('');
+            const [uploading, setUploading] = useState(false);
 
             useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
@@ -310,67 +307,144 @@
             };
 
             const deleteItem = async (coll, id) => {
-                await window.fb.methods.deleteDoc(window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, coll, id));
+                if (confirm("Apakah Anda yakin ingin menghapus data ini?")) {
+                    await window.fb.methods.deleteDoc(window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, coll, id));
+                }
+            };
+
+            // Handler untuk Impor Excel Siswa
+            const handleExcelImport = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                if (!importClassId) {
+                    alert('Silakan pilih Kelas target terlebih dahulu sebelum mengimpor file!');
+                    e.target.value = '';
+                    return;
+                }
+
+                setUploading(true);
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const bstr = evt.target.result;
+                        const wb = XLSX.read(bstr, { type: 'binary' });
+                        const wsname = wb.SheetNames[0];
+                        const ws = wb.Sheets[wsname];
+                        const data = XLSX.utils.sheet_to_json(ws);
+
+                        let count = 0;
+                        for (const row of data) {
+                            // Mencari kolom nama siswa dengan berbagai kemungkinan header umum
+                            const name = row['Nama'] || row['nama'] || row['Nama Siswa'] || row['nama siswa'] || row['NAMA'] || Object.values(row)[0];
+                            if (name && typeof name === 'string' && name.trim() !== '') {
+                                await window.fb.methods.addDoc(
+                                    window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students'), 
+                                    { name: name.trim(), classId: importClassId }
+                                );
+                                count++;
+                            }
+                        }
+                        alert(`Berhasil mengimpor ${count} siswa ke dalam kelas!`);
+                    } catch (err) {
+                        console.error(err);
+                        alert('Gagal membaca file Excel. Pastikan format file benar.');
+                    } finally {
+                        setUploading(false);
+                        e.target.value = '';
+                    }
+                };
+                reader.readAsBinaryString(file);
+            };
+
+            const downloadTemplate = () => {
+                const ws = XLSX.utils.json_to_sheet([{ Nama: "Contoh Nama Siswa 1" }, { Nama: "Contoh Nama Siswa 2" }]);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Format_Siswa");
+                XLSX.writeFile(wb, "Template_Impor_Siswa.xlsx");
             };
 
             return (
                 <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
                     <h1 className="text-4xl font-black text-gray-900 tracking-tight">Manajemen Data</h1>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Box Kelas */}
-                        <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm space-y-8">
+                        <div className="glass-card p-8 rounded-[2.5rem] border-none shadow-sm space-y-6">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-2xl font-bold">Daftar Kelas</h3>
-                                <div className="text-xs font-black px-3 py-1 bg-blue-100 text-blue-600 rounded-full">{classes.length} KELAS</div>
+                                <h3 className="text-xl font-bold">Daftar Kelas</h3>
+                                <span className="text-xs font-black px-3 py-1 bg-blue-100 text-blue-600 rounded-full">{classes.length}</span>
                             </div>
-                            <div className="flex gap-3">
-                                <input value={newClass} onChange={e => setNewClass(e.target.value)} className="flex-1 bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-semibold" placeholder="Nama Kelas (Contoh: VII-A)" />
-                                <button onClick={addClass} className="bg-blue-600 text-white px-8 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100">Tambah</button>
+                            <div className="flex gap-2">
+                                <input value={newClass} onChange={e => setNewClass(e.target.value)} className="flex-1 bg-gray-50 border-none p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-sm" placeholder="Nama Kelas (mis: VII-A)" />
+                                <button onClick={addClass} className="bg-blue-600 text-white px-5 rounded-2xl font-bold hover:bg-blue-700 shadow-md shadow-blue-100 text-sm">Tambah</button>
                             </div>
-                            <div className="space-y-2 max-h-80 overflow-y-auto custom-scroll pr-2">
+                            <div className="space-y-2 max-h-60 overflow-y-auto custom-scroll pr-2">
                                 {classes.map(c => (
-                                    <div key={c.id} className="group p-4 bg-gray-50/50 rounded-2xl flex justify-between items-center border border-transparent hover:border-blue-200 transition-all">
-                                        <span className="font-bold text-gray-700">{c.name}</span>
-                                        <button onClick={() => deleteItem('classes', c.id)} className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" className="w-5 h-5"></i></button>
+                                    <div key={c.id} className="group p-3 bg-gray-50/50 rounded-2xl flex justify-between items-center border border-transparent hover:border-blue-200 transition-all">
+                                        <span className="font-bold text-gray-700 text-sm">{c.name}</span>
+                                        <button onClick={() => deleteItem('classes', c.id)} className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Box Input Siswa */}
-                        <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm space-y-8">
-                            <h3 className="text-2xl font-bold">Input Siswa Baru</h3>
+                        {/* Box Input Siswa Manual */}
+                        <div className="glass-card p-8 rounded-[2.5rem] border-none shadow-sm space-y-6">
+                            <h3 className="text-xl font-bold">Tambah Siswa Satuan</h3>
                             <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Nama Lengkap</label>
-                                    <input value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold" placeholder="Masukkan nama siswa..." />
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nama Lengkap</label>
+                                    <input value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full bg-gray-50 border-none p-4 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-sm" placeholder="Nama siswa..." />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Pilih Kelas</label>
-                                    <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold appearance-none">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pilih Kelas</label>
+                                    <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full bg-gray-50 border-none p-4 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-sm appearance-none">
                                         <option value="">-- Pilih Kelas --</option>
                                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
-                                <button onClick={addStudent} className="w-full bg-emerald-600 text-white p-5 rounded-2xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">Simpan Data Siswa</button>
+                                <button onClick={addStudent} className="w-full bg-emerald-600 text-white p-4 rounded-2xl font-bold hover:bg-emerald-700 shadow-md shadow-emerald-100 transition-all text-sm">Simpan Siswa</button>
+                            </div>
+                        </div>
+
+                        {/* Box Impor Excel */}
+                        <div className="glass-card p-8 rounded-[2.5rem] border-none shadow-sm space-y-6 bg-gradient-to-br from-blue-50/50 to-indigo-50/50">
+                            <h3 className="text-xl font-bold text-blue-900">Impor Excel Siswa</h3>
+                            <div className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Target Kelas Impor</label>
+                                    <select value={importClassId} onChange={e => setImportClassId(e.target.value)} className="w-full bg-white border border-blue-100 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-sm appearance-none">
+                                        <option value="">-- Pilih Kelas Target --</option>
+                                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Pilih File (.xlsx / .csv)</label>
+                                    <input type="file" accept=".xlsx, .xls, .csv" onChange={handleExcelImport} disabled={uploading} className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" />
+                                </div>
+                                <button onClick={downloadTemplate} className="w-full bg-white text-blue-600 border border-blue-200 py-3 rounded-2xl font-bold hover:bg-blue-50 transition-all text-xs flex items-center justify-center gap-2">
+                                    <i data-lucide="download" className="w-4 h-4"></i> Unduh Format Template
+                                </button>
                             </div>
                         </div>
                     </div>
 
                     {/* Tabel Siswa */}
-                    <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm space-y-8">
-                        <h3 className="text-2xl font-bold">Daftar Seluruh Siswa</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm space-y-6">
+                        <h3 className="text-2xl font-bold">Daftar Seluruh Siswa ({students.length})</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto custom-scroll p-1">
                             {students.map(s => (
-                                <div key={s.id} className="p-5 bg-white border border-gray-100 rounded-[1.5rem] flex justify-between items-center group shadow-sm">
-                                    <div className="overflow-hidden">
-                                        <p className="font-bold text-gray-800 truncate">{s.name}</p>
-                                        <p className="text-[10px] text-blue-600 font-black uppercase tracking-tighter">{classes.find(c => c.id === s.classId)?.name || 'N/A'}</p>
+                                <div key={s.id} className="p-4 bg-white border border-gray-100 rounded-[1.5rem] flex justify-between items-center group shadow-sm">
+                                    <div className="overflow-hidden pr-2">
+                                        <p className="font-bold text-gray-800 text-sm truncate">{s.name}</p>
+                                        <p className="text-[10px] text-blue-600 font-black uppercase tracking-tighter">{classes.find(c => c.id === s.classId)?.name || 'Tanpa Kelas'}</p>
                                     </div>
                                     <button onClick={() => deleteItem('students', s.id)} className="text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><i data-lucide="x-circle" className="w-5 h-5"></i></button>
                                 </div>
                             ))}
+                            {students.length === 0 && (
+                                <p className="text-gray-400 text-sm col-span-full text-center py-6">Belum ada data siswa terdaftar.</p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -489,52 +563,102 @@
             );
         };
 
-        const EksporHasil = ({ classes, students, scores }) => {
+        const RekapNilai = ({ classes, students, scores }) => {
             const [selClass, setSelClass] = useState('');
 
             useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
-            const exportToExcel = () => {
-                const meetingTypes = Array.from(new Set(scores.map(s => s.meeting)));
-                const rows = students
-                    .filter(s => !selClass || s.classId === selClass)
-                    .map(student => {
-                        const res = { "Nama Siswa": student.name };
-                        meetingTypes.forEach(type => {
-                            const scoreEntries = scores.filter(sc => sc.studentId === student.id && sc.meeting === type);
-                            // Jika ada beberapa nilai untuk tipe yang sama, ambil yang terbaru
-                            const latestScore = scoreEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
-                            res[type] = latestScore ? latestScore.kog : "-";
-                        });
-                        return res;
-                    });
-                
-                if (rows.length === 0) return alert('Tidak ada data yang bisa diekspor.');
+            // Daftar kategori pertemuan/tugas unik dari data nilai
+            const meetingTypes = useMemo(() => {
+                const filteredScores = selClass ? scores.filter(sc => sc.classId === selClass) : scores;
+                return Array.from(new Set(filteredScores.map(s => s.meeting)));
+            }, [scores, selClass]);
 
-                const ws = XLSX.utils.json_to_sheet(rows);
+            const tableRows = useMemo(() => {
+                const targetStudents = students.filter(s => !selClass || s.classId === selClass);
+                return targetStudents.map(student => {
+                    const res = { id: student.id, name: student.name };
+                    meetingTypes.forEach(type => {
+                        const scoreEntries = scores.filter(sc => sc.studentId === student.id && sc.meeting === type);
+                        const latestScore = scoreEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+                        res[type] = latestScore ? latestScore.kog : "-";
+                    });
+                    return res;
+                });
+            }, [students, scores, selClass, meetingTypes]);
+
+            const exportToExcel = () => {
+                const exportData = tableRows.map(row => {
+                    const item = { "Nama Siswa": row.name };
+                    meetingTypes.forEach(m => {
+                        item[m] = row[m];
+                    });
+                    return item;
+                });
+
+                if (exportData.length === 0) return alert('Tidak ada data nilai yang bisa diekspor.');
+
+                const ws = XLSX.utils.json_to_sheet(exportData);
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Rekap_Nilai");
-                XLSX.writeFile(wb, `Rekap_Nilai_${selClass || 'Semua'}.xlsx`);
+                XLSX.writeFile(wb, `Rekap_Nilai_${classes.find(c => c.id === selClass)?.name || 'Semua_Kelas'}.xlsx`);
             };
 
             return (
                 <div className="space-y-10 animate-in slide-in-from-bottom-4">
-                    <div className="glass-card p-16 rounded-[4rem] text-center space-y-10 border-none shadow-sm">
-                        <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner">
-                            <i data-lucide="file-spreadsheet" className="w-12 h-12"></i>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h1 className="text-4xl font-black text-gray-900 tracking-tight">Rekap Data Nilai</h1>
+                            <p className="text-gray-400 mt-1 font-medium">Tampilan tabel rekapitulasi nilai yang telah diinput oleh guru secara real-time.</p>
                         </div>
-                        <div className="space-y-4">
-                            <h2 className="text-4xl font-black text-gray-900 tracking-tight">Ekspor Data Nilai</h2>
-                            <p className="text-gray-400 font-medium max-w-md mx-auto">Klik tombol di bawah untuk mengunduh rekapitulasi nilai seluruh siswa dalam format Excel (.xlsx)</p>
-                        </div>
-                        <div className="flex flex-col items-center gap-6 max-w-sm mx-auto">
-                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="w-full bg-gray-50 p-5 rounded-2xl border-none font-bold text-center appearance-none outline-none focus:ring-2 focus:ring-emerald-500">
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="bg-white border border-gray-200 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm text-sm">
                                 <option value="">Semua Kelas</option>
                                 {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
-                            <button onClick={exportToExcel} className="w-full bg-emerald-600 text-white p-6 rounded-[2rem] font-extrabold text-xl shadow-2xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-4">
-                                <i data-lucide="download"></i> Download Excel
+                            <button onClick={exportToExcel} className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center gap-2 text-sm">
+                                <i data-lucide="download" className="w-4 h-4"></i> Ekspor Excel
                             </button>
+                        </div>
+                    </div>
+
+                    <div className="glass-card rounded-[3rem] overflow-hidden border-none shadow-sm">
+                        <div className="overflow-x-auto custom-scroll">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-gray-900 text-white">
+                                    <tr>
+                                        <th className="p-6 font-black text-xs uppercase tracking-widest sticky left-0 bg-gray-900 z-10">Nama Siswa</th>
+                                        {meetingTypes.map(m => (
+                                            <th key={m} className="p-6 font-black text-xs uppercase tracking-widest text-center whitespace-nowrap">{m}</th>
+                                        ))}
+                                        {meetingTypes.length === 0 && (
+                                            <th className="p-6 font-black text-xs uppercase tracking-widest text-center text-gray-400">Belum ada data nilai diinput</th>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 bg-white">
+                                    {tableRows.map(row => (
+                                        <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="p-6 font-bold text-gray-800 sticky left-0 bg-white shadow-sm whitespace-nowrap">{row.name}</td>
+                                            {meetingTypes.map(m => (
+                                                <td key={m} className="p-6 text-center font-semibold text-gray-600">
+                                                    <span className={`px-3 py-1 rounded-xl text-sm ${row[m] !== '-' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-300'}`}>
+                                                        {row[m]}
+                                                    </span>
+                                                </td>
+                                            ))}
+                                            {meetingTypes.length === 0 && (
+                                                <td className="p-6 text-center text-gray-400 italic">Silakan lakukan input nilai terlebih dahulu.</td>
+                                            )}
+                                        </tr>
+                                    ))}
+                                    {tableRows.length === 0 && (
+                                        <tr>
+                                            <td colSpan={meetingTypes.length + 1} className="p-10 text-center text-gray-400">Tidak ada siswa ditemukan pada kelas ini.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
