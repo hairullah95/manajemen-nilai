@@ -85,6 +85,7 @@
             const [students, setStudents] = useState([]);
             const [scores, setScores] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [isSidebarOpen, setIsSidebarOpen] = useState(false);
             
             const appId = "eraport-pro-v1";
 
@@ -171,17 +172,40 @@
             );
 
             return (
-                <div className="flex min-h-screen bg-[#fcfcfd]">
-                    {/* Sidebar */}
-                    <aside className="w-72 bg-white border-r border-gray-100 flex flex-col p-8 space-y-10">
-                        <div className="flex items-center gap-4 text-blue-600">
-                            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                                <i data-lucide="book-open" className="w-6 h-6"></i>
+                <div className="flex flex-col md:flex-row min-h-screen bg-[#fcfcfd]">
+                    {/* Mobile Header Bar */}
+                    <div className="md:hidden flex items-center justify-between bg-white border-b border-gray-100 p-4 sticky top-0 z-30">
+                        <div className="flex items-center gap-3 text-blue-600">
+                            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md">
+                                <i data-lucide="book-open" className="w-5 h-5"></i>
                             </div>
-                            <span className="font-extrabold text-2xl tracking-tight text-gray-900">E-Raport</span>
+                            <span className="font-extrabold text-xl tracking-tight text-gray-900">E-Raport</span>
+                        </div>
+                        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2.5 bg-gray-50 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors">
+                            <i data-lucide={isSidebarOpen ? "x" : "menu"} className="w-6 h-6"></i>
+                        </button>
+                    </div>
+
+                    {/* Backdrop for Mobile Sidebar */}
+                    {isSidebarOpen && (
+                        <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/20 z-40 md:hidden backdrop-blur-sm"></div>
+                    )}
+
+                    {/* Sidebar / Navigasi Kiri */}
+                    <aside className={`fixed md:static inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-100 flex flex-col p-6 md:p-8 space-y-8 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 text-blue-600">
+                                <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                                    <i data-lucide="book-open" className="w-5 h-5 md:w-6 md:h-6"></i>
+                                </div>
+                                <span className="font-extrabold text-xl md:text-2xl tracking-tight text-gray-900">E-Raport</span>
+                            </div>
+                            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-gray-600 p-2">
+                                <i data-lucide="x" className="w-6 h-6"></i>
+                            </button>
                         </div>
                         
-                        <nav className="flex-1 space-y-3">
+                        <nav className="flex-1 space-y-2">
                             {[
                                 { id: 'dashboard', label: 'Ringkasan', icon: 'layout' },
                                 { id: 'manajemen', label: 'Data Siswa', icon: 'users' },
@@ -190,8 +214,8 @@
                             ].map(item => (
                                 <button 
                                     key={item.id} 
-                                    onClick={() => setActiveTab(item.id)} 
-                                    className={`w-full flex items-center gap-4 p-4 rounded-2xl font-semibold transition-all duration-300 ${activeTab === item.id ? 'sidebar-active' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'}`}
+                                    onClick={() => { setActiveTab(item.id); setIsSidebarOpen(false); }} 
+                                    className={`w-full flex items-center gap-4 p-3.5 md:p-4 rounded-2xl font-semibold transition-all duration-300 ${activeTab === item.id ? 'sidebar-active' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'}`}
                                 >
                                     <i data-lucide={item.icon} className="w-5 h-5"></i>
                                     {item.label}
@@ -199,7 +223,7 @@
                             ))}
                         </nav>
 
-                        <div className="p-5 bg-gray-50 rounded-2xl">
+                        <div className="p-4 md:p-5 bg-gray-50 rounded-2xl">
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status Database</p>
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
@@ -210,7 +234,7 @@
 
                     {/* Main Content */}
                     <main className="flex-1 overflow-y-auto h-screen custom-scroll">
-                        <div className="max-w-6xl mx-auto p-12">
+                        <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-12 pb-24 md:pb-12">
                             {activeTab === 'dashboard' && <Dashboard classes={classes} students={students} scores={scores} />}
                             {activeTab === 'manajemen' && <ManajemenData classes={classes} students={students} user={user} appId={appId} />}
                             {activeTab === 'input' && <InputNilai classes={classes} students={students} user={user} appId={appId} />}
@@ -224,42 +248,42 @@
         const Dashboard = ({ classes, students, scores }) => {
             useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
             return (
-                <div className="space-y-10 animate-in fade-in duration-500">
+                <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500">
                     <div>
-                        <h1 className="text-4xl font-black text-gray-900 tracking-tight">Selamat Datang, Guru!</h1>
-                        <p className="text-gray-400 mt-2 font-medium">Berikut adalah rangkuman data penilaian Anda hari ini.</p>
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Selamat Datang, Guru!</h1>
+                        <p className="text-gray-400 mt-1 md:mt-2 text-sm md:text-base font-medium">Berikut adalah rangkuman data penilaian Anda hari ini.</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div className="glass-card p-8 rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
-                            <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><i data-lucide="grid"></i></div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
+                        <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
+                            <div className="w-12 h-12 md:w-14 md:h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><i data-lucide="grid"></i></div>
                             <div>
-                                <h2 className="text-4xl font-black text-gray-900">{classes.length}</h2>
-                                <p className="text-gray-400 font-bold text-sm uppercase tracking-widest">Total Kelas</p>
+                                <h2 className="text-3xl md:text-4xl font-black text-gray-900">{classes.length}</h2>
+                                <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest">Total Kelas</p>
                             </div>
                         </div>
-                        <div className="glass-card p-8 rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
-                            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><i data-lucide="users"></i></div>
+                        <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
+                            <div className="w-12 h-12 md:w-14 md:h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><i data-lucide="users"></i></div>
                             <div>
-                                <h2 className="text-4xl font-black text-gray-900">{students.length}</h2>
-                                <p className="text-gray-400 font-bold text-sm uppercase tracking-widest">Siswa Terdaftar</p>
+                                <h2 className="text-3xl md:text-4xl font-black text-gray-900">{students.length}</h2>
+                                <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest">Siswa Terdaftar</p>
                             </div>
                         </div>
-                        <div className="glass-card p-8 rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
-                            <div className="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><i data-lucide="database"></i></div>
+                        <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col gap-4 shadow-sm border-none">
+                            <div className="w-12 h-12 md:w-14 md:h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><i data-lucide="database"></i></div>
                             <div>
-                                <h2 className="text-4xl font-black text-gray-900">{scores.length}</h2>
-                                <p className="text-gray-400 font-bold text-sm uppercase tracking-widest">Entri Nilai</p>
+                                <h2 className="text-3xl md:text-4xl font-black text-gray-900">{scores.length}</h2>
+                                <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest">Entri Nilai</p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm">
-                        <div className="flex items-center gap-4 mb-6">
+                    <div className="glass-card p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-none shadow-sm">
+                        <div className="flex items-center gap-4 mb-4 md:mb-6">
                             <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><i data-lucide="info" className="w-5 h-5"></i></div>
-                            <h3 className="text-xl font-bold">Panduan Singkat</h3>
+                            <h3 className="text-lg md:text-xl font-bold">Panduan Singkat</h3>
                         </div>
-                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-500 font-medium">
+                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 text-gray-500 font-medium text-sm md:text-base">
                             <li className="flex gap-3">
                                 <span className="text-blue-600 font-black">1.</span>
                                 Daftarkan kelas Anda atau impor siswa secara massal menggunakan file Excel (.xlsx).
@@ -312,7 +336,6 @@
                 }
             };
 
-            // Handler untuk Impor Excel Siswa
             const handleExcelImport = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -334,7 +357,6 @@
 
                         let count = 0;
                         for (const row of data) {
-                            // Mencari kolom nama siswa dengan berbagai kemungkinan header umum
                             const name = row['Nama'] || row['nama'] || row['Nama Siswa'] || row['nama siswa'] || row['NAMA'] || Object.values(row)[0];
                             if (name && typeof name === 'string' && name.trim() !== '') {
                                 await window.fb.methods.addDoc(
@@ -364,18 +386,18 @@
             };
 
             return (
-                <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                    <h1 className="text-4xl font-black text-gray-900 tracking-tight">Manajemen Data</h1>
+                <div className="space-y-6 md:space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Manajemen Data</h1>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
                         {/* Box Kelas */}
-                        <div className="glass-card p-8 rounded-[2.5rem] border-none shadow-sm space-y-6">
+                        <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-none shadow-sm space-y-6">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-xl font-bold">Daftar Kelas</h3>
+                                <h3 className="text-lg md:text-xl font-bold">Daftar Kelas</h3>
                                 <span className="text-xs font-black px-3 py-1 bg-blue-100 text-blue-600 rounded-full">{classes.length}</span>
                             </div>
                             <div className="flex gap-2">
-                                <input value={newClass} onChange={e => setNewClass(e.target.value)} className="flex-1 bg-gray-50 border-none p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-sm" placeholder="Nama Kelas (mis: VII-A)" />
+                                <input value={newClass} onChange={e => setNewClass(e.target.value)} className="flex-1 bg-gray-50 border-none p-3.5 md:p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-sm" placeholder="Nama Kelas (mis: VII-A)" />
                                 <button onClick={addClass} className="bg-blue-600 text-white px-5 rounded-2xl font-bold hover:bg-blue-700 shadow-md shadow-blue-100 text-sm">Tambah</button>
                             </div>
                             <div className="space-y-2 max-h-60 overflow-y-auto custom-scroll pr-2">
@@ -389,31 +411,31 @@
                         </div>
 
                         {/* Box Input Siswa Manual */}
-                        <div className="glass-card p-8 rounded-[2.5rem] border-none shadow-sm space-y-6">
-                            <h3 className="text-xl font-bold">Tambah Siswa Satuan</h3>
+                        <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-none shadow-sm space-y-6">
+                            <h3 className="text-lg md:text-xl font-bold">Tambah Siswa Satuan</h3>
                             <div className="space-y-4">
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nama Lengkap</label>
-                                    <input value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full bg-gray-50 border-none p-4 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-sm" placeholder="Nama siswa..." />
+                                    <input value={studentName} onChange={e => setStudentName(e.target.value)} className="w-full bg-gray-50 border-none p-3.5 md:p-4 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-sm" placeholder="Nama siswa..." />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pilih Kelas</label>
-                                    <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full bg-gray-50 border-none p-4 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-sm appearance-none">
+                                    <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full bg-gray-50 border-none p-3.5 md:p-4 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 font-semibold text-sm appearance-none">
                                         <option value="">-- Pilih Kelas --</option>
                                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
-                                <button onClick={addStudent} className="w-full bg-emerald-600 text-white p-4 rounded-2xl font-bold hover:bg-emerald-700 shadow-md shadow-emerald-100 transition-all text-sm">Simpan Siswa</button>
+                                <button onClick={addStudent} className="w-full bg-emerald-600 text-white p-3.5 md:p-4 rounded-2xl font-bold hover:bg-emerald-700 shadow-md shadow-emerald-100 transition-all text-sm">Simpan Siswa</button>
                             </div>
                         </div>
 
                         {/* Box Impor Excel */}
-                        <div className="glass-card p-8 rounded-[2.5rem] border-none shadow-sm space-y-6 bg-gradient-to-br from-blue-50/50 to-indigo-50/50">
-                            <h3 className="text-xl font-bold text-blue-900">Impor Excel Siswa</h3>
+                        <div className="glass-card p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border-none shadow-sm space-y-6 bg-gradient-to-br from-blue-50/50 to-indigo-50/50">
+                            <h3 className="text-lg md:text-xl font-bold text-blue-900">Impor Excel Siswa</h3>
                             <div className="space-y-4">
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Target Kelas Impor</label>
-                                    <select value={importClassId} onChange={e => setImportClassId(e.target.value)} className="w-full bg-white border border-blue-100 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-sm appearance-none">
+                                    <select value={importClassId} onChange={e => setImportClassId(e.target.value)} className="w-full bg-white border border-blue-100 p-3.5 md:p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-sm appearance-none">
                                         <option value="">-- Pilih Kelas Target --</option>
                                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
@@ -430,9 +452,9 @@
                     </div>
 
                     {/* Tabel Siswa */}
-                    <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm space-y-6">
-                        <h3 className="text-2xl font-bold">Daftar Seluruh Siswa ({students.length})</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto custom-scroll p-1">
+                    <div className="glass-card p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-none shadow-sm space-y-6">
+                        <h3 className="text-xl md:text-2xl font-bold">Daftar Seluruh Siswa ({students.length})</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto custom-scroll p-1">
                             {students.map(s => (
                                 <div key={s.id} className="p-4 bg-white border border-gray-100 rounded-[1.5rem] flex justify-between items-center group shadow-sm">
                                     <div className="overflow-hidden pr-2">
@@ -496,32 +518,32 @@
             };
 
             return (
-                <div className="space-y-10 animate-in slide-in-from-bottom-4">
-                    <h1 className="text-4xl font-black text-gray-900 tracking-tight">Penilaian Harian</h1>
+                <div className="space-y-6 md:space-y-10 animate-in slide-in-from-bottom-4">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Penilaian Harian</h1>
                     
-                    <div className="glass-card p-10 rounded-[3rem] border-none shadow-sm grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="glass-card p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-none shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                         <div className="space-y-2">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Pilih Kelas</label>
-                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold appearance-none">
+                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="w-full bg-gray-50 border-none p-4 md:p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold appearance-none text-sm">
                                 <option value="">Pilih...</option>
                                 {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </div>
                         <div className="space-y-2">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Mata Pelajaran</label>
-                            <input value={selSubject} onChange={e => setSelSubject(e.target.value)} placeholder="Contoh: Matematika" className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
+                            <input value={selSubject} onChange={e => setSelSubject(e.target.value)} placeholder="Contoh: Matematika" className="w-full bg-gray-50 border-none p-4 md:p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm" />
                         </div>
                         <div className="space-y-2">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Pertemuan / Tugas</label>
-                            <input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="Contoh: PH 1 / Tugas 2" className="w-full bg-gray-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
+                            <input value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="Contoh: PH 1 / Tugas 2" className="w-full bg-gray-50 border-none p-4 md:p-5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm" />
                         </div>
                     </div>
 
                     {selClass && (
-                        <div className="glass-card rounded-[3rem] overflow-hidden border-none shadow-lg">
-                            <div className="bg-gray-900 p-8 flex justify-between items-center">
-                                <h4 className="text-white font-bold text-xl">Daftar Penilaian Siswa</h4>
-                                <div className="flex items-center gap-4">
+                        <div className="glass-card rounded-[2rem] md:rounded-[3rem] overflow-hidden border-none shadow-lg">
+                            <div className="bg-gray-900 p-6 md:p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <h4 className="text-white font-bold text-lg md:text-xl">Daftar Penilaian Siswa</h4>
+                                <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Set Semua:</span>
                                     <input value={bulkVal} onChange={e => handleBulk(e.target.value)} type="number" className="w-24 bg-white/10 border border-white/20 p-2 rounded-lg text-white text-center font-bold outline-none focus:border-blue-400" placeholder="0" />
                                 </div>
@@ -530,20 +552,20 @@
                                 <table className="w-full text-left">
                                     <thead className="bg-gray-50">
                                         <tr>
-                                            <th className="p-6 font-black text-xs text-gray-400 uppercase tracking-widest">Nama Siswa</th>
-                                            <th className="p-6 font-black text-xs text-gray-400 uppercase tracking-widest text-center">Nilai Angka</th>
+                                            <th className="p-4 md:p-6 font-black text-xs text-gray-400 uppercase tracking-widest">Nama Siswa</th>
+                                            <th className="p-4 md:p-6 font-black text-xs text-gray-400 uppercase tracking-widest text-center">Nilai Angka</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {filteredStudents.map(s => (
                                             <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="p-6 font-bold text-gray-700">{s.name}</td>
-                                                <td className="p-6 text-center">
+                                                <td className="p-4 md:p-6 font-bold text-gray-700 text-sm md:text-base">{s.name}</td>
+                                                <td className="p-4 md:p-6 text-center">
                                                     <input 
                                                         value={inputData[s.id] || ''} 
                                                         onChange={e => setInputData({...inputData, [s.id]: parseFloat(e.target.value)||0})} 
                                                         type="number" 
-                                                        className="w-32 p-4 rounded-2xl border-2 border-gray-100 text-center font-black text-xl focus:border-blue-500 outline-none transition-all" 
+                                                        className="w-28 md:w-32 p-3 md:p-4 rounded-2xl border-2 border-gray-100 text-center font-black text-lg md:text-xl focus:border-blue-500 outline-none transition-all" 
                                                         placeholder="0" 
                                                     />
                                                 </td>
@@ -552,8 +574,8 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="p-10 bg-gray-50/50">
-                                <button onClick={saveAll} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black text-lg shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-4">
+                            <div className="p-6 md:p-10 bg-gray-50/50">
+                                <button onClick={saveAll} className="w-full bg-blue-600 text-white py-4 md:py-5 rounded-[1.5rem] md:rounded-[2rem] font-black text-base md:text-lg shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-3">
                                     <i data-lucide="save"></i> SIMPAN SEMUA NILAI KE DATABASE
                                 </button>
                             </div>
@@ -568,7 +590,6 @@
 
             useEffect(() => { if(window.lucide) window.lucide.createIcons(); }, []);
 
-            // Daftar kategori pertemuan/tugas unik dari data nilai
             const meetingTypes = useMemo(() => {
                 const filteredScores = selClass ? scores.filter(sc => sc.classId === selClass) : scores;
                 return Array.from(new Set(filteredScores.map(s => s.meeting)));
@@ -605,50 +626,50 @@
             };
 
             return (
-                <div className="space-y-10 animate-in slide-in-from-bottom-4">
+                <div className="space-y-6 md:space-y-10 animate-in slide-in-from-bottom-4">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                            <h1 className="text-4xl font-black text-gray-900 tracking-tight">Rekap Data Nilai</h1>
-                            <p className="text-gray-400 mt-1 font-medium">Tampilan tabel rekapitulasi nilai yang telah diinput oleh guru secara real-time.</p>
+                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Rekap Data Nilai</h1>
+                            <p className="text-gray-400 mt-1 text-sm md:text-base font-medium">Tampilan tabel rekapitulasi nilai yang telah diinput oleh guru secara real-time.</p>
                         </div>
-                        <div className="flex items-center gap-4 w-full md:w-auto">
-                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="bg-white border border-gray-200 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm text-sm">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                            <select value={selClass} onChange={e => setSelClass(e.target.value)} className="bg-white border border-gray-200 p-3.5 md:p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm text-sm">
                                 <option value="">Semua Kelas</option>
                                 {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
-                            <button onClick={exportToExcel} className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center gap-2 text-sm">
+                            <button onClick={exportToExcel} className="bg-emerald-600 text-white px-6 py-3.5 md:py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 text-sm">
                                 <i data-lucide="download" className="w-4 h-4"></i> Ekspor Excel
                             </button>
                         </div>
                     </div>
 
-                    <div className="glass-card rounded-[3rem] overflow-hidden border-none shadow-sm">
+                    <div className="glass-card rounded-[2rem] md:rounded-[3rem] overflow-hidden border-none shadow-sm">
                         <div className="overflow-x-auto custom-scroll">
                             <table className="w-full text-left border-collapse">
                                 <thead className="bg-gray-900 text-white">
                                     <tr>
-                                        <th className="p-6 font-black text-xs uppercase tracking-widest sticky left-0 bg-gray-900 z-10">Nama Siswa</th>
+                                        <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest sticky left-0 bg-gray-900 z-10">Nama Siswa</th>
                                         {meetingTypes.map(m => (
-                                            <th key={m} className="p-6 font-black text-xs uppercase tracking-widest text-center whitespace-nowrap">{m}</th>
+                                            <th key={m} className="p-4 md:p-6 font-black text-xs uppercase tracking-widest text-center whitespace-nowrap">{m}</th>
                                         ))}
                                         {meetingTypes.length === 0 && (
-                                            <th className="p-6 font-black text-xs uppercase tracking-widest text-center text-gray-400">Belum ada data nilai diinput</th>
+                                            <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest text-center text-gray-400">Belum ada data nilai diinput</th>
                                         )}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 bg-white">
                                     {tableRows.map(row => (
                                         <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="p-6 font-bold text-gray-800 sticky left-0 bg-white shadow-sm whitespace-nowrap">{row.name}</td>
+                                            <td className="p-4 md:p-6 font-bold text-gray-800 sticky left-0 bg-white shadow-sm whitespace-nowrap text-sm md:text-base">{row.name}</td>
                                             {meetingTypes.map(m => (
-                                                <td key={m} className="p-6 text-center font-semibold text-gray-600">
-                                                    <span className={`px-3 py-1 rounded-xl text-sm ${row[m] !== '-' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-300'}`}>
+                                                <td key={m} className="p-4 md:p-6 text-center font-semibold text-gray-600">
+                                                    <span className={`px-3 py-1 rounded-xl text-xs md:text-sm ${row[m] !== '-' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-300'}`}>
                                                         {row[m]}
                                                     </span>
                                                 </td>
                                             ))}
                                             {meetingTypes.length === 0 && (
-                                                <td className="p-6 text-center text-gray-400 italic">Silakan lakukan input nilai terlebih dahulu.</td>
+                                                <td className="p-4 md:p-6 text-center text-gray-400 italic">Silakan lakukan input nilai terlebih dahulu.</td>
                                             )}
                                         </tr>
                                     ))}
