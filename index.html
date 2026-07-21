@@ -6,7 +6,7 @@
     <title>E-Raport Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -77,6 +77,8 @@
         const { useState, useEffect, useMemo } = React;
 
         const App = () => {
+            const [accessCode, setAccessCode] = useState(localStorage.getItem('eraport_access_code') || '');
+            const [tempCode, setTempCode] = useState('');
             const [user, setUser] = useState(null);
             const [fbReady, setFbReady] = useState(!!window.fb);
             const [error, setError] = useState(null);
@@ -84,7 +86,7 @@
             const [classes, setClasses] = useState([]);
             const [students, setStudents] = useState([]);
             const [scores, setScores] = useState([]);
-            const [loading, setLoading] = useState(true);
+            const [loading, setLoading] = useState(false);
             const [isSidebarOpen, setIsSidebarOpen] = useState(false);
             
             const appId = "eraport-pro-v1";
@@ -106,12 +108,12 @@
                 };
             }, []);
 
-            // Menggunakan ID tetap agar laptop dan HP mengakses database yang sama persis
+            // Set user berdasarkan kode akses yang diinput
             useEffect(() => {
-                if (!fbReady) return;
-                setUser({ uid: 'guru-utama' });
+                if (!fbReady || !accessCode) return;
+                setUser({ uid: accessCode.trim().toLowerCase() });
                 setLoading(false);
-            }, [fbReady]);
+            }, [fbReady, accessCode]);
 
             useEffect(() => {
                 if (!user || !fbReady) return;
@@ -135,6 +137,22 @@
                 return () => { unsubClasses(); unsubStudents(); unsubScores(); };
             }, [user, fbReady]);
 
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (!tempCode.trim()) return alert('Masukkan Kode Akses terlebih dahulu!');
+                const cleanCode = tempCode.trim().toLowerCase();
+                localStorage.setItem('eraport_access_code', cleanCode);
+                setAccessCode(cleanCode);
+            };
+
+            const handleLogout = () => {
+                if (confirm('Keluar dari sesi ini?')) {
+                    localStorage.removeItem('eraport_access_code');
+                    setAccessCode('');
+                    setUser(null);
+                }
+            };
+
             if (error) return (
                 <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-white">
                     <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
@@ -145,6 +163,40 @@
                     <button onClick={() => window.location.reload()} className="mt-6 bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg hover:bg-blue-700">Refresh Halaman</button>
                 </div>
             );
+
+            // Tampilan Halaman Login / Kode Akses
+            if (!accessCode) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
+                        <div className="glass-card w-full max-w-md p-8 md:p-10 rounded-[2.5rem] shadow-xl space-y-6 bg-white">
+                            <div className="text-center space-y-2">
+                                <div className="w-16 h-16 bg-blue-600 text-white rounded-3xl mx-auto flex items-center justify-center shadow-lg shadow-blue-200">
+                                    <i data-lucide="book-open" className="w-8 h-8"></i>
+                                </div>
+                                <h1 className="text-2xl font-black text-gray-900 tracking-tight">E-Raport Pro</h1>
+                                <p className="text-gray-400 text-sm font-medium">Masukkan Kode Akses / ID Guru yang sama di Laptop & HP Anda untuk menyinkronkan data.</p>
+                            </div>
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Kode Akses Unik</label>
+                                    <input 
+                                        type="text" 
+                                        value={tempCode} 
+                                        onChange={e => setTempCode(e.target.value)} 
+                                        placeholder="Contoh: guruandalan2026" 
+                                        className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl outline-none focus:border-blue-600 font-bold text-sm text-center tracking-wider" 
+                                        required 
+                                    />
+                                </div>
+                                <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all text-sm">
+                                    MASUK & SINKRONKAN
+                                </button>
+                            </form>
+                            <p className="text-xs text-center text-gray-400">💡 Tips: Gunakan kode yang sama di HP dan laptop agar data langsung terhubung.</p>
+                        </div>
+                    </div>
+                );
+            }
 
             if (loading) return (
                 <div className="h-screen flex flex-col items-center justify-center gap-4 bg-white">
@@ -208,12 +260,14 @@
                             ))}
                         </nav>
 
-                        <div className="p-4 md:p-5 bg-gray-50 rounded-2xl">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status Database</p>
-                            <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                                <span className="text-xs font-bold text-gray-700">Terhubung</span>
+                        <div className="space-y-4">
+                            <div className="p-4 bg-gray-50 rounded-2xl space-y-1">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kode Akses Aktif</p>
+                                <p className="text-xs font-black text-blue-600 truncate">{accessCode}</p>
                             </div>
+                            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 p-3 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+                                <i data-lucide="log-out" className="w-4 h-4"></i> Ganti Kode / Keluar
+                            </button>
                         </div>
                     </aside>
 
