@@ -106,26 +106,11 @@
                 };
             }, []);
 
+            // Menggunakan ID tetap agar laptop dan HP mengakses database yang sama persis
             useEffect(() => {
                 if (!fbReady) return;
-
-                const initAuth = async () => {
-                    try {
-                        await window.fb.methods.signInAnonymously(window.fb.auth);
-                    } catch (err) {
-                        console.error("Auth error:", err);
-                        setError("Koneksi gagal. Silakan periksa koneksi internet Anda.");
-                    }
-                };
-
-                initAuth();
-                const unsubscribe = window.fb.methods.onAuthStateChanged(window.fb.auth, (u) => {
-                    if (u) {
-                        setUser(u);
-                        setLoading(false);
-                    }
-                });
-                return () => unsubscribe();
+                setUser({ uid: 'guru-utama' });
+                setLoading(false);
             }, [fbReady]);
 
             useEffect(() => {
