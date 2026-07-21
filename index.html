@@ -44,6 +44,9 @@
                 const auth = getAuth(app);
                 const db = getFirestore(app);
 
+                // Autentikasi otomatis agar izin tulis database aktif
+                await signInAnonymously(auth);
+
                 window.fb = { 
                     auth, 
                     db, 
@@ -337,22 +340,36 @@
 
             const addClass = async () => {
                 if (!newClass || !user) return;
-                await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: newClass });
-                setNewClass('');
+                try {
+                    await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: newClass });
+                    setNewClass('');
+                } catch (err) {
+                    console.error("Gagal tambah kelas:", err);
+                    alert("Gagal menambahkan kelas. Periksa koneksi internet Anda.");
+                }
             };
 
             const addStudent = async () => {
                 if (!studentName || !selectedClassId || !user) return;
-                await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students'), { 
-                    name: studentName, 
-                    classId: selectedClassId 
-                });
-                setStudentName('');
+                try {
+                    await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'students'), { 
+                        name: studentName, 
+                        classId: selectedClassId 
+                    });
+                    setStudentName('');
+                } catch (err) {
+                    console.error("Gagal tambah siswa:", err);
+                    alert("Gagal menambahkan siswa.");
+                }
             };
 
             const deleteItem = async (coll, id) => {
                 if (confirm("Apakah Anda yakin ingin menghapus data ini?")) {
-                    await window.fb.methods.deleteDoc(window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, coll, id));
+                    try {
+                        await window.fb.methods.deleteDoc(window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, coll, id));
+                    } catch (err) {
+                        console.error("Gagal hapus:", err);
+                    }
                 }
             };
 
@@ -527,7 +544,8 @@
                     setBulkVal('');
                     setInputData({});
                 } catch (e) {
-                    alert('Gagal menyimpan data.');
+                    console.error("Gagal simpan nilai:", e);
+                    alert('Gagal menyimpan data ke database.');
                 }
             };
 
