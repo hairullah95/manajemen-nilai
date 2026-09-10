@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" translate="no" class="notranslate">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -76,7 +76,21 @@
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // Komponen Ikon Aman untuk React (Isolasi DOM Mutation)
+        const Icon = ({ name, className = "w-5 h-5" }) => {
+            const iconRef = useRef(null);
+
+            useEffect(() => {
+                if (window.lucide && iconRef.current) {
+                    iconRef.current.innerHTML = `<i data-lucide="${name}" class="${className}"></i>`;
+                    window.lucide.createIcons({ root: iconRef.current });
+                }
+            }, [name, className]);
+
+            return <span ref={iconRef} className="inline-flex items-center justify-center flex-shrink-0" />;
+        };
 
         // Opsi Kehadiran
         const ATTENDANCE_OPTIONS = [
@@ -229,10 +243,6 @@
                 return () => { unsubClasses(); unsubStudents(); unsubScores(); };
             }, [user, fbReady]);
 
-            useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
-            });
-
             const handleLogin = (e) => {
                 e.preventDefault();
                 if (!tempCode.trim()) return alert('Masukkan Kode Akses terlebih dahulu!');
@@ -252,7 +262,7 @@
             if (error) return (
                 <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-white">
                     <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
-                        <i data-lucide="alert-circle" className="w-10 h-10"></i>
+                        <Icon name="alert-circle" className="w-10 h-10" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Gagal Memuat Firebase</h2>
                     <p className="text-gray-500 max-w-md">{error}</p>
@@ -266,7 +276,7 @@
                         <div className="glass-card w-full max-w-md p-8 md:p-10 rounded-[2.5rem] shadow-xl space-y-6 bg-white">
                             <div className="text-center space-y-2">
                                 <div className="w-16 h-16 bg-blue-600 text-white rounded-3xl mx-auto flex items-center justify-center shadow-lg shadow-blue-200">
-                                    <i data-lucide="book-open" className="w-8 h-8"></i>
+                                    <Icon name="book-open" className="w-8 h-8" />
                                 </div>
                                 <h1 className="text-2xl font-black text-gray-900 tracking-tight">E-Raport Pro</h1>
                                 <p className="text-gray-400 text-sm font-medium">Masukkan Kode Akses / ID Guru untuk menyinkronkan data.</p>
@@ -309,12 +319,12 @@
                     <div className="md:hidden flex items-center justify-between bg-white border-b border-gray-100 p-4 sticky top-0 z-30 shadow-sm">
                         <div className="flex items-center gap-3 text-blue-600">
                             <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md">
-                                <i data-lucide="book-open" className="w-5 h-5"></i>
+                                <Icon name="book-open" className="w-5 h-5" />
                             </div>
                             <span className="font-extrabold text-lg tracking-tight text-gray-900">E-Raport Pro</span>
                         </div>
                         <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2.5 bg-gray-50 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors">
-                            <i data-lucide={isMobileOpen ? "x" : "menu"} className="w-6 h-6"></i>
+                            <Icon name={isMobileOpen ? "x" : "menu"} className="w-6 h-6" />
                         </button>
                     </div>
 
@@ -332,7 +342,7 @@
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3 text-blue-600 overflow-hidden">
                                 <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-2xl flex-shrink-0 flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                                    <i data-lucide="book-open" className="w-5 h-5 md:w-6 md:h-6"></i>
+                                    <Icon name="book-open" className="w-5 h-5 md:w-6 md:h-6" />
                                 </div>
                                 {isSidebarOpen && (
                                     <span className="font-extrabold text-xl md:text-2xl tracking-tight text-gray-900 truncate">E-Raport</span>
@@ -345,12 +355,12 @@
                                 className="hidden md:flex p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
                                 title={isSidebarOpen ? "Sembunyikan Menu" : "Tampilkan Menu"}
                             >
-                                <i data-lucide={isSidebarOpen ? "panel-left-close" : "panel-left-open"} className="w-5 h-5"></i>
+                                <Icon name={isSidebarOpen ? "panel-left-close" : "panel-left-open"} className="w-5 h-5" />
                             </button>
 
                             {/* Tombol Tutup Mobile */}
                             <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-gray-400 hover:text-gray-600 p-2">
-                                <i data-lucide="x" className="w-6 h-6"></i>
+                                <Icon name="x" className="w-6 h-6" />
                             </button>
                         </div>
                         
@@ -368,7 +378,7 @@
                                     className={`w-full flex items-center gap-4 p-3.5 md:p-4 rounded-2xl font-semibold transition-all duration-300 ${activeTab === item.id ? 'sidebar-active' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'} ${!isSidebarOpen && 'md:justify-center md:px-0'}`}
                                     title={!isSidebarOpen ? item.label : ''}
                                 >
-                                    <i data-lucide={item.icon} className="w-5 h-5 flex-shrink-0"></i>
+                                    <Icon name={item.icon} className="w-5 h-5" />
                                     {isSidebarOpen && <span className="truncate">{item.label}</span>}
                                 </button>
                             ))}
@@ -383,7 +393,7 @@
                                 </div>
                             ) : (
                                 <div className="hidden md:flex justify-center p-2 bg-gray-50 rounded-xl" title={`Kode: ${accessCode}`}>
-                                    <i data-lucide="key" className="w-4 h-4 text-blue-600"></i>
+                                    <Icon name="key" className="w-4 h-4 text-blue-600" />
                                 </div>
                             )}
 
@@ -392,7 +402,7 @@
                                 className={`w-full flex items-center gap-2 p-3 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors ${!isSidebarOpen && 'md:justify-center'}`}
                                 title={!isSidebarOpen ? 'Keluar' : ''}
                             >
-                                <i data-lucide="log-out" className="w-4 h-4 flex-shrink-0"></i> 
+                                <Icon name="log-out" className="w-4 h-4" /> 
                                 {isSidebarOpen && <span>Ganti Kode / Keluar</span>}
                             </button>
                         </div>
@@ -406,7 +416,7 @@
                                 onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
                                 className="flex items-center gap-2 text-xs font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-xl transition-colors"
                             >
-                                <i data-lucide={isSidebarOpen ? "chevron-left" : "menu"} className="w-4 h-4"></i>
+                                <Icon name={isSidebarOpen ? "chevron-left" : "menu"} className="w-4 h-4" />
                                 <span>{isSidebarOpen ? "Sembunyikan Menu" : "Tampilkan Menu"}</span>
                             </button>
                             <span className="text-xs font-bold text-gray-400">Status: <span className="text-emerald-600">Tersambung (Online)</span></span>
@@ -423,7 +433,7 @@
             );
         };
 
-        // Component 1: Dashboard dengan Analisis Nilai Siswa
+        // Component 1: Dashboard
         const Dashboard = ({ classes, students, scores }) => {
             const calculatedData = useMemo(() => {
                 return calculateStudentStats(students, scores, classes);
@@ -461,28 +471,28 @@
                     {/* Stat Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 md:gap-6">
                         <div className="glass-card p-6 rounded-[2rem] flex flex-col gap-3 shadow-sm border-none">
-                            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><i data-lucide="grid"></i></div>
+                            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><Icon name="grid" /></div>
                             <div>
                                 <h2 className="text-3xl font-black text-gray-900">{classes.length}</h2>
                                 <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Total Kelas</p>
                             </div>
                         </div>
                         <div className="glass-card p-6 rounded-[2rem] flex flex-col gap-3 shadow-sm border-none">
-                            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><i data-lucide="users"></i></div>
+                            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><Icon name="users" /></div>
                             <div>
                                 <h2 className="text-3xl font-black text-gray-900">{students.length}</h2>
                                 <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Siswa Terdaftar</p>
                             </div>
                         </div>
                         <div className="glass-card p-6 rounded-[2rem] flex flex-col gap-3 shadow-sm border-none">
-                            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><i data-lucide="database"></i></div>
+                            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><Icon name="database" /></div>
                             <div>
                                 <h2 className="text-3xl font-black text-gray-900">{scores.length}</h2>
                                 <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Entri Penilaian</p>
                             </div>
                         </div>
                         <div className="glass-card p-6 rounded-[2rem] flex flex-col gap-3 shadow-sm border-none">
-                            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center"><i data-lucide="award"></i></div>
+                            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center"><Icon name="award" /></div>
                             <div>
                                 <h2 className="text-3xl font-black text-gray-900">{averageClassScore}</h2>
                                 <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Rata-rata Keseluruhan</p>
@@ -490,11 +500,11 @@
                         </div>
                     </div>
 
-                    {/* Analisis Nilai Siswa (Nilai Tertinggi & Nilai Terendah) */}
+                    {/* Analisis Nilai Siswa */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
-                                <i data-lucide="bar-chart-2" className="w-5 h-5"></i>
+                                <Icon name="bar-chart-2" className="w-5 h-5" />
                             </div>
                             <h2 className="text-xl md:text-2xl font-black text-gray-900">Analisis Nilai Siswa</h2>
                         </div>
@@ -504,9 +514,7 @@
                             <div className="glass-card p-6 md:p-8 rounded-[2rem] border-l-8 border-l-emerald-500 shadow-sm space-y-4 bg-gradient-to-br from-emerald-50/40 to-white">
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center font-bold">
-                                            🏆
-                                        </div>
+                                        <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center font-bold">🏆</div>
                                         <div>
                                             <h3 className="font-extrabold text-gray-900 text-lg">Nilai Tertinggi</h3>
                                             <p className="text-xs text-gray-400">Prestasi akademis teratas</p>
@@ -542,9 +550,7 @@
                             <div className="glass-card p-6 md:p-8 rounded-[2rem] border-l-8 border-l-rose-500 shadow-sm space-y-4 bg-gradient-to-br from-rose-50/40 to-white">
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center font-bold">
-                                            ⚠️
-                                        </div>
+                                        <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center font-bold">⚠️</div>
                                         <div>
                                             <h3 className="font-extrabold text-gray-900 text-lg">Nilai Terendah</h3>
                                             <p className="text-xs text-gray-400">Memerlukan bimbingan tambahan</p>
@@ -581,7 +587,7 @@
                     {/* Panduan Singkat */}
                     <div className="glass-card p-6 md:p-8 rounded-[2.5rem] border-none shadow-sm">
                         <div className="flex items-center gap-4 mb-4">
-                            <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><i data-lucide="info" className="w-5 h-5"></i></div>
+                            <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><Icon name="info" className="w-5 h-5" /></div>
                             <h3 className="text-lg md:text-xl font-bold">Ketentuan & Rumus Penilaian</h3>
                         </div>
                         <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-600 font-medium text-sm">
@@ -595,7 +601,7 @@
             );
         };
 
-        // Component 2: Data Siswa (Dengan Edit Nama Kelas & Nama Siswa)
+        // Component 2: Data Siswa
         const ManajemenData = ({ classes, students, user, appId }) => {
             const [newClass, setNewClass] = useState('');
             const [studentName, setStudentName] = useState('');
@@ -603,10 +609,8 @@
             const [importClassId, setImportClassId] = useState('');
             const [uploading, setUploading] = useState(false);
 
-            // State Edit Kelas
-            const [editingClass, setEditingClass] = useState(null); // { id, name }
-            // State Edit Siswa
-            const [editingStudent, setEditingStudent] = useState(null); // { id, name, classId }
+            const [editingClass, setEditingClass] = useState(null);
+            const [editingStudent, setEditingStudent] = useState(null);
 
             const addClass = async () => {
                 if (!newClass || !user) return;
@@ -750,14 +754,14 @@
                                                 className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                 title="Edit Nama Kelas"
                                             >
-                                                <i data-lucide="edit-2" className="w-4 h-4"></i>
+                                                <Icon name="edit-2" className="w-4 h-4" />
                                             </button>
                                             <button 
                                                 onClick={() => deleteItem('classes', c.id)} 
                                                 className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                 title="Hapus Kelas"
                                             >
-                                                <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                                <Icon name="trash-2" className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>
@@ -800,13 +804,13 @@
                                     <input type="file" accept=".xlsx, .xls, .csv" onChange={handleExcelImport} disabled={uploading} className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" />
                                 </div>
                                 <button onClick={downloadTemplate} className="w-full bg-white text-blue-600 border border-blue-200 py-3 rounded-2xl font-bold hover:bg-blue-50 transition-all text-xs flex items-center justify-center gap-2">
-                                    <i data-lucide="download" className="w-4 h-4"></i> Unduh Format Template
+                                    <Icon name="download" className="w-4 h-4" /> Unduh Format Template
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Daftar Seluruh Siswa dengan Tombol Edit Nama & Delete */}
+                    {/* Daftar Seluruh Siswa */}
                     <div className="glass-card p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border-none shadow-sm space-y-6">
                         <h3 className="text-xl md:text-2xl font-bold">Daftar Seluruh Siswa Urut A-Z ({students.length})</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto custom-scroll p-1">
@@ -822,14 +826,14 @@
                                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
                                             title="Edit Nama Siswa / Kelas"
                                         >
-                                            <i data-lucide="edit-3" className="w-4 h-4"></i>
+                                            <Icon name="edit-3" className="w-4 h-4" />
                                         </button>
                                         <button 
                                             onClick={() => deleteItem('students', s.id)} 
                                             className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
                                             title="Hapus Siswa"
                                         >
-                                            <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                            <Icon name="trash-2" className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </div>
@@ -899,21 +903,19 @@
             );
         };
 
-        // Component 3: Input Nilai (Kehadiran, Hafalan, Penilaian Harian)
+        // Component 3: Input Nilai
         const InputNilai = ({ classes, students, user, appId }) => {
             const [selClass, setSelClass] = useState('');
-            const [jenisNilai, setJenisNilai] = useState('Kehadiran'); // Kehadiran, Hafalan, Penilaian Harian
+            const [jenisNilai, setJenisNilai] = useState('Kehadiran');
             const [meetingName, setMeetingName] = useState('');
             
-            // State penampung input per jenis penilaian
-            const [attendanceData, setAttendanceData] = useState({}); // { studentId: score }
-            const [hafalanData, setHafalanData] = useState({}); // { studentId: [h1, h2, ..., h9] }
-            const [phData, setPhData] = useState({}); // { studentId: score }
+            const [attendanceData, setAttendanceData] = useState({});
+            const [hafalanData, setHafalanData] = useState({});
+            const [phData, setPhData] = useState({});
             const [bulkVal, setBulkVal] = useState('');
 
             const filteredStudents = useMemo(() => students.filter(s => s.classId === selClass), [students, selClass]);
 
-            // Reset state saat kelas atau jenis nilai berganti
             useEffect(() => {
                 setAttendanceData({});
                 setHafalanData({});
@@ -921,7 +923,6 @@
                 setBulkVal('');
             }, [selClass, jenisNilai]);
 
-            // Set Massal untuk PH / Kehadiran
             const handleBulkPH = (val) => {
                 setBulkVal(val);
                 const updated = {};
@@ -939,7 +940,6 @@
                 setAttendanceData(updated);
             };
 
-            // Handling Simpan Kehadiran
             const saveKehadiran = async () => {
                 if (!selClass || !meetingName) return alert('Mohon pilih Kelas dan isi Nama Pertemuan!');
                 if (Object.keys(attendanceData).length === 0) return alert('Belum ada status kehadiran yang dipilih.');
@@ -963,7 +963,6 @@
                 }
             };
 
-            // Handling Simpan Hafalan
             const saveHafalan = async () => {
                 if (!selClass) return alert('Mohon pilih Kelas!');
                 if (Object.keys(hafalanData).length === 0) return alert('Belum ada nilai hafalan yang diinput.');
@@ -986,7 +985,6 @@
                 }
             };
 
-            // Handling Simpan PH
             const savePH = async () => {
                 if (!selClass || !meetingName) return alert('Mohon pilih Kelas dan isi Nama Pertemuan!');
                 if (Object.keys(phData).length === 0) return alert('Belum ada nilai yang diinput.');
@@ -1015,7 +1013,6 @@
                 <div className="space-y-6 md:space-y-10 animate-in slide-in-from-bottom-4">
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Input Penilaian Siswa</h1>
                     
-                    {/* Header Input Dropdown */}
                     <div className="glass-card p-6 md:p-8 rounded-[2rem] border-none shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest">1. Pilih Kelas</label>
@@ -1034,10 +1031,8 @@
                         </div>
                     </div>
 
-                    {/* Tampilan Sesuai Jenis Nilai yang Dipilih */}
                     {selClass ? (
                         <div className="space-y-6">
-                            {/* Option A: KEHADIRAN */}
                             {jenisNilai === 'Kehadiran' && (
                                 <div className="glass-card rounded-[2rem] md:rounded-[3rem] overflow-hidden border-none shadow-lg space-y-6">
                                     <div className="bg-gradient-to-r from-blue-900 to-indigo-900 p-6 md:p-8 text-white space-y-4">
@@ -1056,7 +1051,6 @@
                                             </div>
                                         </div>
 
-                                        {/* Set Semua Kehadiran */}
                                         <div className="pt-2 border-t border-white/10 flex items-center gap-2 overflow-x-auto custom-scroll pb-2">
                                             <span className="text-[10px] uppercase font-black tracking-widest text-blue-200 whitespace-nowrap">Set Semua:</span>
                                             {ATTENDANCE_OPTIONS.map(opt => (
@@ -1077,7 +1071,6 @@
                                                 <div key={s.id} className="py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-gray-50/50 p-3 rounded-2xl">
                                                     <span className="font-bold text-gray-800 text-sm lg:w-1/4">{s.name}</span>
                                                     
-                                                    {/* Pilihan Opsi Kehadiran */}
                                                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 flex-1">
                                                         {ATTENDANCE_OPTIONS.map(opt => {
                                                             const isSelected = attendanceData[s.id] === opt.score;
@@ -1102,13 +1095,12 @@
                                         </div>
 
                                         <button onClick={saveKehadiran} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-base shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 mt-6">
-                                            <i data-lucide="save"></i> SIMPAN KEHADIRAN (50%)
+                                            <Icon name="save" /> SIMPAN KEHADIRAN (50%)
                                         </button>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Option B: HAFALAN */}
                             {jenisNilai === 'Hafalan' && (
                                 <div className="glass-card rounded-[2rem] md:rounded-[3rem] overflow-hidden border-none shadow-lg space-y-6">
                                     <div className="bg-gradient-to-r from-emerald-900 to-teal-900 p-6 md:p-8 text-white">
@@ -1154,13 +1146,12 @@
                                         </table>
 
                                         <button onClick={saveHafalan} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-base shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 mt-8">
-                                            <i data-lucide="save"></i> SIMPAN SEMUA NILAI HAFALAN
+                                            <Icon name="save" /> SIMPAN SEMUA NILAI HAFALAN
                                         </button>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Option C: PENILAIAN HARIAN */}
                             {jenisNilai === 'Penilaian Harian' && (
                                 <div className="glass-card rounded-[2rem] md:rounded-[3rem] overflow-hidden border-none shadow-lg space-y-6">
                                     <div className="bg-gray-900 p-6 md:p-8 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -1205,7 +1196,7 @@
                                         </div>
 
                                         <button onClick={savePH} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-base shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 mt-6">
-                                            <i data-lucide="save"></i> SIMPAN PENILAIAN HARIAN (50%)
+                                            <Icon name="save" /> SIMPAN PENILAIAN HARIAN (50%)
                                         </button>
                                     </div>
                                 </div>
@@ -1213,7 +1204,7 @@
                         </div>
                     ) : (
                         <div className="glass-card p-12 text-center rounded-[2.5rem] border-none text-gray-400 font-medium">
-                            <i data-lucide="arrow-up" className="w-8 h-8 mx-auto mb-2 animate-bounce text-blue-500"></i>
+                            <Icon name="arrow-up" className="w-8 h-8 mx-auto mb-2 animate-bounce text-blue-500" />
                             Silakan pilih Kelas terlebih dahulu untuk menginput nilai.
                         </div>
                     )}
@@ -1263,7 +1254,7 @@
                                 {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                             <button onClick={exportToExcel} className="bg-emerald-600 text-white px-6 py-3.5 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 text-sm">
-                                <i data-lucide="download" className="w-4 h-4"></i> Ekspor Excel
+                                <Icon name="download" className="w-4 h-4" /> Ekspor Excel
                             </button>
                         </div>
                     </div>
