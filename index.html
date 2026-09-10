@@ -78,7 +78,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // Komponen Ikon Aman untuk React (Isolasi DOM Mutation)
+        // Komponen Ikon Aman untuk React
         const Icon = ({ name, className = "w-5 h-5" }) => {
             const iconRef = useRef(null);
 
@@ -115,9 +115,10 @@
                 studentScores.forEach(sc => {
                     if (sc.type === 'kehadiran' || sc.type === 'ph') {
                         if (!sc.meeting) return;
-                        if (!meetingMap[sc.meeting]) meetingMap[sc.meeting] = {};
-                        if (sc.type === 'kehadiran') meetingMap[sc.meeting].kehadiran = parseFloat(sc.score) || 0;
-                        if (sc.type === 'ph') meetingMap[sc.meeting].ph = parseFloat(sc.score) || 0;
+                        const mKey = sc.meeting.trim();
+                        if (!meetingMap[mKey]) meetingMap[mKey] = {};
+                        if (sc.type === 'kehadiran') meetingMap[mKey].kehadiran = parseFloat(sc.score) || 0;
+                        if (sc.type === 'ph') meetingMap[mKey].ph = parseFloat(sc.score) || 0;
                     }
                 });
 
@@ -184,7 +185,6 @@
             const [scores, setScores] = useState([]);
             const [loading, setLoading] = useState(false);
             
-            // State Sembunyikan/Tampilkan Menu Sidebar (Responsive)
             const [isSidebarOpen, setIsSidebarOpen] = useState(true);
             const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -349,7 +349,6 @@
                                 )}
                             </div>
                             
-                            {/* Tombol Sembunyikan Sidebar Desktop */}
                             <button 
                                 onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
                                 className="hidden md:flex p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
@@ -358,7 +357,6 @@
                                 <Icon name={isSidebarOpen ? "panel-left-close" : "panel-left-open"} className="w-5 h-5" />
                             </button>
 
-                            {/* Tombol Tutup Mobile */}
                             <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-gray-400 hover:text-gray-600 p-2">
                                 <Icon name="x" className="w-6 h-6" />
                             </button>
@@ -410,7 +408,6 @@
 
                     {/* Area Konten Utama */}
                     <main className="flex-1 overflow-y-auto h-screen custom-scroll">
-                        {/* Header bar desktop toggle */}
                         <div className="hidden md:flex items-center justify-between p-4 px-8 bg-white border-b border-gray-100">
                             <button 
                                 onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
@@ -425,7 +422,7 @@
                         <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-12 pb-24 md:pb-12">
                             {activeTab === 'dashboard' && <Dashboard classes={sortedClasses} students={sortedStudents} scores={scores} />}
                             {activeTab === 'manajemen' && <ManajemenData classes={sortedClasses} students={sortedStudents} user={user} appId={appId} />}
-                            {activeTab === 'input' && <InputNilai classes={sortedClasses} students={sortedStudents} user={user} appId={appId} />}
+                            {activeTab === 'input' && <InputNilai classes={sortedClasses} students={sortedStudents} scores={scores} user={user} appId={appId} />}
                             {activeTab === 'rekap' && <RekapNilai classes={sortedClasses} students={sortedStudents} scores={scores} />}
                         </div>
                     </main>
@@ -454,6 +451,11 @@
                 const minVal = studentsWithScores[studentsWithScores.length - 1].overallAvg;
                 return studentsWithScores.filter(s => s.overallAvg === minVal);
             }, [studentsWithScores]);
+
+            // Filter data siswa yang nilainya masih kosong, 0, atau belum lengkap
+            const emptyOrZeroStudents = useMemo(() => {
+                return calculatedData.filter(s => !s.hasScores || s.overallAvg === 0 || s.meetingAvg === '-' || s.hafalanAvg === '-');
+            }, [calculatedData]);
 
             const averageClassScore = useMemo(() => {
                 if (studentsWithScores.length === 0) return 0;
@@ -497,6 +499,51 @@
                                 <h2 className="text-3xl font-black text-gray-900">{averageClassScore}</h2>
                                 <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Rata-rata Keseluruhan</p>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Section Baru: Daftar Siswa dengan Nilai Kosong atau Nol */}
+                    <div className="glass-card p-6 md:p-8 rounded-[2rem] border-l-8 border-l-amber-500 shadow-sm space-y-4 bg-gradient-to-br from-amber-50/40 to-white">
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center font-bold">
+                                    <Icon name="alert-triangle" className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-gray-900 text-lg">Daftar Siswa Nilai Kosong / Nol / Belum Lengkap</h3>
+                                    <p className="text-xs text-gray-400">Siswa yang belum diinput nilainya atau masih memiliki nilai kosong</p>
+                                </div>
+                            </div>
+                            <span className="text-xl font-black text-amber-700 bg-amber-100 px-4 py-1.5 rounded-2xl">
+                                {emptyOrZeroStudents.length} Siswa
+                            </span>
+                        </div>
+
+                        <div className="space-y-2 pt-2 max-h-72 overflow-y-auto custom-scroll pr-1">
+                            {emptyOrZeroStudents.length > 0 ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {emptyOrZeroStudents.map(s => (
+                                        <div key={s.id} className="p-3.5 bg-white rounded-xl border border-amber-200 flex justify-between items-center shadow-sm hover:border-amber-400 transition-all">
+                                            <div>
+                                                <p className="font-bold text-gray-800 text-sm">{s.name}</p>
+                                                <p className="text-[10px] text-amber-600 font-black uppercase">{s.className}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg inline-block ${!s.hasScores ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
+                                                    {!s.hasScores ? 'Belum Ada Nilai' : `Rata-rata: ${s.overallAvg}`}
+                                                </span>
+                                                <p className="text-[10px] text-gray-400 mt-1">
+                                                    Pertemuan: {s.meetingAvg} | Hafalan: {s.hafalanAvg}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-emerald-700 font-bold text-sm italic py-4 text-center bg-emerald-50 rounded-2xl">
+                                    ✨ Semua siswa telah memiliki data nilai yang lengkap.
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -592,9 +639,9 @@
                         </div>
                         <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-600 font-medium text-sm">
                             <li className="flex gap-3"><span className="text-blue-600 font-black">1.</span> <strong>Total Nilai Pertemuan:</strong> Dihitung gabungan (50% Kehadiran + 50% Penilaian Harian).</li>
-                            <li className="flex gap-3"><span className="text-blue-600 font-black">2.</span> <strong>Nilai Hafalan:</strong> Berdiri sendiri terdiri dari 9 kolom hafalan terpisah.</li>
+                            <li className="flex gap-3"><span className="text-blue-600 font-black">2.</span> <strong>Nilai Hafalan:</strong> Tersimpan otomatis dan dapat dilanjutkan progress-nya kapan saja.</li>
                             <li className="flex gap-3"><span className="text-blue-600 font-black">3.</span> <strong>Skor Kehadiran:</strong> Memiliki simbol dan nilai otomatis (100 s.d 65).</li>
-                            <li className="flex gap-3"><span className="text-blue-600 font-black">4.</span> <strong>Analisis Otomatis:</strong> Nilai tertinggi dan terendah diperbarui secara real-time.</li>
+                            <li className="flex gap-3"><span className="text-blue-600 font-black">4.</span> <strong>Rincian Rekap:</strong> Menampilkan rincian nilai tiap pertemuan secara eksplisit.</li>
                         </ul>
                     </div>
                 </div>
@@ -903,25 +950,112 @@
             );
         };
 
-        // Component 3: Input Nilai
-        const InputNilai = ({ classes, students, user, appId }) => {
+        // Component 3: Input Nilai (Dengan Fitur Edit Nilai Sebelumnya)
+        const InputNilai = ({ classes, students, scores, user, appId }) => {
             const [selClass, setSelClass] = useState('');
             const [jenisNilai, setJenisNilai] = useState('Kehadiran');
             const [meetingName, setMeetingName] = useState('');
             
             const [attendanceData, setAttendanceData] = useState({});
+            const [kehadiranDocIds, setKehadiranDocIds] = useState({});
+
             const [hafalanData, setHafalanData] = useState({});
+            const [hafalanDocIds, setHafalanDocIds] = useState({});
+
             const [phData, setPhData] = useState({});
+            const [phDocIds, setPhDocIds] = useState({});
             const [bulkVal, setBulkVal] = useState('');
 
             const filteredStudents = useMemo(() => students.filter(s => s.classId === selClass), [students, selClass]);
 
+            // Dapatkan daftar pertemuan yang sudah pernah dibuat untuk kelas & jenis penilaian terpilih
+            const existingMeetings = useMemo(() => {
+                if (!selClass) return [];
+                const targetType = jenisNilai === 'Kehadiran' ? 'kehadiran' : (jenisNilai === 'Penilaian Harian' ? 'ph' : '');
+                if (!targetType) return [];
+
+                const setM = new Set();
+                scores.filter(s => s.classId === selClass && s.type === targetType).forEach(s => {
+                    if (s.meeting) setM.add(s.meeting.trim());
+                });
+                return Array.from(setM).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+            }, [scores, selClass, jenisNilai]);
+
+            // Reset field ketika mengganti kelas atau jenis penilaian
             useEffect(() => {
+                setMeetingName('');
                 setAttendanceData({});
-                setHafalanData({});
+                setKehadiranDocIds({});
                 setPhData({});
+                setPhDocIds({});
                 setBulkVal('');
             }, [selClass, jenisNilai]);
+
+            // Muat data Kehadiran / PH jika Nama Pertemuan diisi atau dipilih dari yang sudah ada
+            useEffect(() => {
+                if (!selClass || !meetingName.trim()) {
+                    if (jenisNilai !== 'Hafalan') {
+                        setAttendanceData({});
+                        setKehadiranDocIds({});
+                        setPhData({});
+                        setPhDocIds({});
+                    }
+                    return;
+                }
+
+                if (jenisNilai === 'Kehadiran') {
+                    const currentMeetingScores = scores.filter(
+                        s => s.classId === selClass && s.type === 'kehadiran' && s.meeting?.trim().toLowerCase() === meetingName.trim().toLowerCase()
+                    );
+                    const loadedAttendance = {};
+                    const loadedDocIds = {};
+                    currentMeetingScores.forEach(s => {
+                        loadedAttendance[s.studentId] = parseFloat(s.score);
+                        loadedDocIds[s.studentId] = s.id;
+                    });
+                    setAttendanceData(loadedAttendance);
+                    setKehadiranDocIds(loadedDocIds);
+                } else if (jenisNilai === 'Penilaian Harian') {
+                    const currentPhScores = scores.filter(
+                        s => s.classId === selClass && s.type === 'ph' && s.meeting?.trim().toLowerCase() === meetingName.trim().toLowerCase()
+                    );
+                    const loadedPh = {};
+                    const loadedDocIds = {};
+                    currentPhScores.forEach(s => {
+                        loadedPh[s.studentId] = parseFloat(s.score);
+                        loadedDocIds[s.studentId] = s.id;
+                    });
+                    setPhData(loadedPh);
+                    setPhDocIds(loadedDocIds);
+                }
+            }, [selClass, jenisNilai, meetingName, scores]);
+
+            // Muat Nilai Hafalan yang Sudah Ada
+            useEffect(() => {
+                if (jenisNilai === 'Hafalan' && selClass) {
+                    const classHafalanScores = scores.filter(s => s.classId === selClass && s.type === 'hafalan');
+                    
+                    const initialHafalanData = {};
+                    const docIds = {};
+
+                    filteredStudents.forEach(student => {
+                        const studentHafalans = classHafalanScores
+                            .filter(s => s.studentId === student.id)
+                            .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+                        if (studentHafalans.length > 0) {
+                            const latest = studentHafalans[0];
+                            initialHafalanData[student.id] = latest.hafalanScores || Array(9).fill("");
+                            docIds[student.id] = latest.id;
+                        } else {
+                            initialHafalanData[student.id] = Array(9).fill("");
+                        }
+                    });
+
+                    setHafalanData(initialHafalanData);
+                    setHafalanDocIds(docIds);
+                }
+            }, [selClass, jenisNilai, scores, filteredStudents]);
 
             const handleBulkPH = (val) => {
                 setBulkVal(val);
@@ -946,17 +1080,34 @@
 
                 try {
                     for (const studentId of Object.keys(attendanceData)) {
-                        await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), {
-                            studentId, 
-                            classId: selClass, 
-                            type: 'kehadiran', 
-                            meeting: meetingName.trim(),
-                            score: attendanceData[studentId],
-                            timestamp: new Date().toISOString()
-                        });
+                        const scoreVal = attendanceData[studentId];
+                        if (scoreVal === undefined || scoreVal === null) continue;
+
+                        const existingDocId = kehadiranDocIds[studentId];
+                        if (existingDocId) {
+                            await window.fb.methods.updateDoc(
+                                window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores', existingDocId),
+                                {
+                                    score: scoreVal,
+                                    timestamp: new Date().toISOString()
+                                }
+                            );
+                        } else {
+                            const docRef = await window.fb.methods.addDoc(
+                                window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), 
+                                {
+                                    studentId, 
+                                    classId: selClass, 
+                                    type: 'kehadiran', 
+                                    meeting: meetingName.trim(),
+                                    score: scoreVal,
+                                    timestamp: new Date().toISOString()
+                                }
+                            );
+                            setKehadiranDocIds(prev => ({ ...prev, [studentId]: docRef.id }));
+                        }
                     }
-                    alert('Data Kehadiran berhasil disimpan!');
-                    setAttendanceData({});
+                    alert('Data Kehadiran berhasil disimpan / diperbarui!');
                 } catch (e) {
                     console.error("Gagal simpan kehadiran:", e);
                     alert("Error Firebase: " + e.message);
@@ -969,16 +1120,32 @@
 
                 try {
                     for (const studentId of Object.keys(hafalanData)) {
-                        await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), {
-                            studentId, 
-                            classId: selClass, 
-                            type: 'hafalan', 
-                            hafalanScores: hafalanData[studentId] || Array(9).fill(""),
-                            timestamp: new Date().toISOString()
-                        });
+                        const scoresToSave = hafalanData[studentId] || Array(9).fill("");
+                        const existingDocId = hafalanDocIds[studentId];
+
+                        if (existingDocId) {
+                            await window.fb.methods.updateDoc(
+                                window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores', existingDocId),
+                                {
+                                    hafalanScores: scoresToSave,
+                                    timestamp: new Date().toISOString()
+                                }
+                            );
+                        } else {
+                            const docRef = await window.fb.methods.addDoc(
+                                window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), 
+                                {
+                                    studentId, 
+                                    classId: selClass, 
+                                    type: 'hafalan', 
+                                    hafalanScores: scoresToSave,
+                                    timestamp: new Date().toISOString()
+                                }
+                            );
+                            setHafalanDocIds(prev => ({ ...prev, [studentId]: docRef.id }));
+                        }
                     }
-                    alert('Data Hafalan berhasil disimpan!');
-                    setHafalanData({});
+                    alert('Data Progress Hafalan berhasil diperbarui!');
                 } catch (e) {
                     console.error("Gagal simpan hafalan:", e);
                     alert("Error Firebase: " + e.message);
@@ -991,18 +1158,34 @@
 
                 try {
                     for (const studentId of Object.keys(phData)) {
-                        await window.fb.methods.addDoc(window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), {
-                            studentId, 
-                            classId: selClass, 
-                            type: 'ph', 
-                            meeting: meetingName.trim(),
-                            score: phData[studentId],
-                            timestamp: new Date().toISOString()
-                        });
+                        const scoreVal = phData[studentId];
+                        if (scoreVal === undefined || scoreVal === null) continue;
+
+                        const existingDocId = phDocIds[studentId];
+                        if (existingDocId) {
+                            await window.fb.methods.updateDoc(
+                                window.fb.methods.doc(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores', existingDocId),
+                                {
+                                    score: scoreVal,
+                                    timestamp: new Date().toISOString()
+                                }
+                            );
+                        } else {
+                            const docRef = await window.fb.methods.addDoc(
+                                window.fb.methods.collection(window.fb.db, 'artifacts', appId, 'users', user.uid, 'scores'), 
+                                {
+                                    studentId, 
+                                    classId: selClass, 
+                                    type: 'ph', 
+                                    meeting: meetingName.trim(),
+                                    score: scoreVal,
+                                    timestamp: new Date().toISOString()
+                                }
+                            );
+                            setPhDocIds(prev => ({ ...prev, [studentId]: docRef.id }));
+                        }
                     }
-                    alert('Data Penilaian Harian berhasil disimpan!');
-                    setPhData({});
-                    setBulkVal('');
+                    alert('Data Penilaian Harian berhasil disimpan / diperbarui!');
                 } catch (e) {
                     console.error("Gagal simpan PH:", e);
                     alert("Error Firebase: " + e.message);
@@ -1011,7 +1194,7 @@
 
             return (
                 <div className="space-y-6 md:space-y-10 animate-in slide-in-from-bottom-4">
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Input Penilaian Siswa</h1>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Input & Edit Penilaian Siswa</h1>
                     
                     <div className="glass-card p-6 md:p-8 rounded-[2rem] border-none shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
@@ -1038,18 +1221,39 @@
                                     <div className="bg-gradient-to-r from-blue-900 to-indigo-900 p-6 md:p-8 text-white space-y-4">
                                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                             <div>
-                                                <h3 className="text-xl font-bold">Input Presensi & Kehadiran</h3>
+                                                <h3 className="text-xl font-bold">Input & Edit Kehadiran</h3>
                                                 <p className="text-xs text-blue-200">Bobot Kehadiran 50% dari total nilai pertemuan.</p>
                                             </div>
-                                            <div className="w-full md:w-auto">
+
+                                            {/* Pilihan Pertemuan Sebelumnya & Input Pertemuan Baru */}
+                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                                                {existingMeetings.length > 0 && (
+                                                    <select 
+                                                        value={existingMeetings.includes(meetingName) ? meetingName : ''} 
+                                                        onChange={e => { if (e.target.value) setMeetingName(e.target.value); }} 
+                                                        className="bg-white/20 text-white border border-white/30 p-3 rounded-2xl text-xs font-bold outline-none cursor-pointer"
+                                                    >
+                                                        <option value="" className="text-gray-900">-- Pilih Pertemuan Lama --</option>
+                                                        {existingMeetings.map(m => (
+                                                            <option key={m} value={m} className="text-gray-900">{m}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
                                                 <input 
                                                     value={meetingName} 
                                                     onChange={e => setMeetingName(e.target.value)} 
-                                                    placeholder="Nama Pertemuan (Contoh: Pertemuan 1)" 
-                                                    className="w-full md:w-72 bg-white/10 border border-white/20 p-3.5 rounded-2xl text-white placeholder-blue-200 text-sm font-bold outline-none focus:border-white" 
+                                                    placeholder="Nama / Ketik Pertemuan Baru" 
+                                                    className="w-full sm:w-64 bg-white/10 border border-white/20 p-3.5 rounded-2xl text-white placeholder-blue-200 text-sm font-bold outline-none focus:border-white" 
                                                 />
                                             </div>
                                         </div>
+
+                                        {Object.keys(kehadiranDocIds).length > 0 && (
+                                            <div className="bg-blue-500/20 border border-blue-300/40 text-blue-100 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                                                <Icon name="edit-3" className="w-4 h-4 text-blue-300" />
+                                                <span>Memuat data nilai sebelumnya untuk "{meetingName}". Anda dapat memperbarui nilainya kembali.</span>
+                                            </div>
+                                        )}
 
                                         <div className="pt-2 border-t border-white/10 flex items-center gap-2 overflow-x-auto custom-scroll pb-2">
                                             <span className="text-[10px] uppercase font-black tracking-widest text-blue-200 whitespace-nowrap">Set Semua:</span>
@@ -1095,7 +1299,7 @@
                                         </div>
 
                                         <button onClick={saveKehadiran} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-base shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 mt-6">
-                                            <Icon name="save" /> SIMPAN KEHADIRAN (50%)
+                                            <Icon name="save" /> SIMPAN / PERBARUI KEHADIRAN (50%)
                                         </button>
                                     </div>
                                 </div>
@@ -1104,8 +1308,8 @@
                             {jenisNilai === 'Hafalan' && (
                                 <div className="glass-card rounded-[2rem] md:rounded-[3rem] overflow-hidden border-none shadow-lg space-y-6">
                                     <div className="bg-gradient-to-r from-emerald-900 to-teal-900 p-6 md:p-8 text-white">
-                                        <h3 className="text-xl font-bold">Input Nilai Hafalan (9 Kolom Nilai)</h3>
-                                        <p className="text-xs text-emerald-200">Penilaian hafalan berdiri sendiri dari nilai harian.</p>
+                                        <h3 className="text-xl font-bold">Input & Edit Progress Hafalan</h3>
+                                        <p className="text-xs text-emerald-200">Nilai hafalan otomatis tersimpan secara terus menerus untuk memantau sejauh mana progress siswa.</p>
                                     </div>
 
                                     <div className="p-4 md:p-8 overflow-x-auto custom-scroll">
@@ -1128,7 +1332,7 @@
                                                                 <td key={colIdx} className="p-1.5 text-center">
                                                                     <input 
                                                                         type="number"
-                                                                        value={currentHafalan[colIdx] || ''}
+                                                                        value={currentHafalan[colIdx] !== undefined ? currentHafalan[colIdx] : ''}
                                                                         onChange={e => {
                                                                             const updatedArr = [...currentHafalan];
                                                                             updatedArr[colIdx] = e.target.value;
@@ -1146,7 +1350,7 @@
                                         </table>
 
                                         <button onClick={saveHafalan} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-base shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 mt-8">
-                                            <Icon name="save" /> SIMPAN SEMUA NILAI HAFALAN
+                                            <Icon name="save" /> SIMPAN / PERBARUI PROGRESS HAFALAN
                                         </button>
                                     </div>
                                 </div>
@@ -1154,29 +1358,50 @@
 
                             {jenisNilai === 'Penilaian Harian' && (
                                 <div className="glass-card rounded-[2rem] md:rounded-[3rem] overflow-hidden border-none shadow-lg space-y-6">
-                                    <div className="bg-gray-900 p-6 md:p-8 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                        <div>
-                                            <h3 className="text-xl font-bold">Input Penilaian Harian (PH)</h3>
-                                            <p className="text-xs text-gray-400">Bobot Penilaian Harian 50% dari total nilai pertemuan.</p>
-                                        </div>
-                                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                                            <input 
-                                                value={meetingName} 
-                                                onChange={e => setMeetingName(e.target.value)} 
-                                                placeholder="Nama Pertemuan (Contoh: PH 1)" 
-                                                className="w-full sm:w-60 bg-white/10 border border-white/20 p-3 rounded-xl text-white placeholder-gray-400 text-sm font-bold outline-none focus:border-blue-400" 
-                                            />
-                                            <div className="flex items-center gap-2 bg-white/10 p-1.5 rounded-xl border border-white/20 w-full sm:w-auto">
-                                                <span className="text-[10px] text-gray-400 font-bold uppercase pl-2">Set:</span>
+                                    <div className="bg-gray-900 p-6 md:p-8 text-white space-y-4">
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                            <div>
+                                                <h3 className="text-xl font-bold">Input & Edit Penilaian Harian (PH)</h3>
+                                                <p className="text-xs text-gray-400">Bobot Penilaian Harian 50% dari total nilai pertemuan.</p>
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                                                {existingMeetings.length > 0 && (
+                                                    <select 
+                                                        value={existingMeetings.includes(meetingName) ? meetingName : ''} 
+                                                        onChange={e => { if (e.target.value) setMeetingName(e.target.value); }} 
+                                                        className="bg-white/20 text-white border border-white/30 p-3 rounded-2xl text-xs font-bold outline-none cursor-pointer"
+                                                    >
+                                                        <option value="" className="text-gray-900">-- Pilih Pertemuan Lama --</option>
+                                                        {existingMeetings.map(m => (
+                                                            <option key={m} value={m} className="text-gray-900">{m}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
                                                 <input 
-                                                    value={bulkVal} 
-                                                    onChange={e => handleBulkPH(e.target.value)} 
-                                                    type="number" 
-                                                    className="w-16 bg-transparent text-white font-bold text-center outline-none" 
-                                                    placeholder="0" 
+                                                    value={meetingName} 
+                                                    onChange={e => setMeetingName(e.target.value)} 
+                                                    placeholder="Nama / Ketik Pertemuan Baru" 
+                                                    className="w-full sm:w-60 bg-white/10 border border-white/20 p-3.5 rounded-2xl text-white placeholder-gray-400 text-sm font-bold outline-none focus:border-blue-400" 
                                                 />
+                                                <div className="flex items-center gap-2 bg-white/10 p-1.5 rounded-xl border border-white/20 w-full sm:w-auto">
+                                                    <span className="text-[10px] text-gray-400 font-bold uppercase pl-2">Set:</span>
+                                                    <input 
+                                                        value={bulkVal} 
+                                                        onChange={e => handleBulkPH(e.target.value)} 
+                                                        type="number" 
+                                                        className="w-16 bg-transparent text-white font-bold text-center outline-none" 
+                                                        placeholder="0" 
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
+
+                                        {Object.keys(phDocIds).length > 0 && (
+                                            <div className="bg-white/10 border border-white/20 text-blue-200 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                                                <Icon name="edit-3" className="w-4 h-4 text-blue-300" />
+                                                <span>Memuat data PH sebelumnya untuk "{meetingName}". Anda dapat memperbarui nilainya kembali.</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="p-6 md:p-8 space-y-4">
@@ -1196,7 +1421,7 @@
                                         </div>
 
                                         <button onClick={savePH} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-base shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 mt-6">
-                                            <Icon name="save" /> SIMPAN PENILAIAN HARIAN (50%)
+                                            <Icon name="save" /> SIMPAN / PERBARUI PENILAIAN HARIAN (50%)
                                         </button>
                                     </div>
                                 </div>
@@ -1205,7 +1430,7 @@
                     ) : (
                         <div className="glass-card p-12 text-center rounded-[2.5rem] border-none text-gray-400 font-medium">
                             <Icon name="arrow-up" className="w-8 h-8 mx-auto mb-2 animate-bounce text-blue-500" />
-                            Silakan pilih Kelas terlebih dahulu untuk menginput nilai.
+                            Silakan pilih Kelas terlebih dahulu untuk menginput atau mengedit nilai.
                         </div>
                     )}
                 </div>
@@ -1216,22 +1441,97 @@
         const RekapNilai = ({ classes, students, scores }) => {
             const [selClass, setSelClass] = useState('');
 
-            const calculatedData = useMemo(() => {
-                return calculateStudentStats(students, scores, classes);
-            }, [students, scores, classes]);
+            const meetingsList = useMemo(() => {
+                const filteredScores = selClass ? scores.filter(s => s.classId === selClass) : scores;
+                const setM = new Set();
+                filteredScores.forEach(s => {
+                    if ((s.type === 'kehadiran' || s.type === 'ph') && s.meeting) {
+                        setM.add(s.meeting.trim());
+                    }
+                });
+                return Array.from(setM).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+            }, [scores, selClass]);
 
             const tableRows = useMemo(() => {
-                return calculatedData.filter(s => !selClass || s.classId === selClass);
-            }, [calculatedData, selClass]);
+                const studentsToProcess = selClass ? students.filter(s => s.classId === selClass) : students;
+
+                return studentsToProcess.map(student => {
+                    const studentScores = scores.filter(s => s.studentId === student.id);
+                    const className = classes.find(c => c.id === student.classId)?.name || 'Tanpa Kelas';
+
+                    const meetingScores = {};
+                    meetingsList.forEach(mName => {
+                        const kehDoc = studentScores.find(s => s.type === 'kehadiran' && s.meeting?.trim() === mName);
+                        const phDoc = studentScores.find(s => s.type === 'ph' && s.meeting?.trim() === mName);
+
+                        const keh = kehDoc ? parseFloat(kehDoc.score) : null;
+                        const ph = phDoc ? parseFloat(phDoc.score) : null;
+
+                        if (keh !== null && ph !== null) {
+                            meetingScores[mName] = ((keh * 0.5) + (ph * 0.5)).toFixed(1);
+                        } else if (keh !== null) {
+                            meetingScores[mName] = keh.toFixed(1);
+                        } else if (ph !== null) {
+                            meetingScores[mName] = ph.toFixed(1);
+                        } else {
+                            meetingScores[mName] = '-';
+                        }
+                    });
+
+                    const validMeetingVals = Object.values(meetingScores).filter(v => v !== '-').map(Number);
+                    const meetingAvg = validMeetingVals.length > 0 
+                        ? (validMeetingVals.reduce((a, b) => a + b, 0) / validMeetingVals.length).toFixed(1)
+                        : '-';
+
+                    const hafalanEntries = studentScores.filter(sc => sc.type === 'hafalan');
+                    let hafalanScores = [];
+                    hafalanEntries.forEach(he => {
+                        if (Array.isArray(he.hafalanScores)) {
+                            hafalanScores = [...hafalanScores, ...he.hafalanScores.filter(v => v !== "" && v !== null && !isNaN(v)).map(Number)];
+                        }
+                    });
+
+                    const hafalanAvg = hafalanScores.length > 0 
+                        ? (hafalanScores.reduce((a, b) => a + b, 0) / hafalanScores.length).toFixed(1)
+                        : '-';
+
+                    let finalComponents = [];
+                    if (meetingAvg !== '-') finalComponents.push(parseFloat(meetingAvg));
+                    if (hafalanAvg !== '-') finalComponents.push(parseFloat(hafalanAvg));
+
+                    const overallAvg = finalComponents.length > 0 
+                        ? (finalComponents.reduce((a, b) => a + b, 0) / finalComponents.length).toFixed(1)
+                        : 0;
+
+                    return {
+                        id: student.id,
+                        name: student.name,
+                        className,
+                        meetingScores,
+                        meetingAvg,
+                        hafalanAvg,
+                        overallAvg: parseFloat(overallAvg)
+                    };
+                }).sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
+            }, [students, scores, classes, selClass, meetingsList]);
 
             const exportToExcel = () => {
-                const exportData = tableRows.map(s => ({
-                    "Nama Siswa": s.name,
-                    "Kelas": s.className,
-                    "Rata-rata Pertemuan (50% Kehadiran + 50% PH)": s.meetingAvg,
-                    "Rata-rata Hafalan": s.hafalanAvg,
-                    "Nilai Akhir Keseluruhan": s.overallAvg
-                }));
+                const exportData = tableRows.map(s => {
+                    const rowObj = {
+                        "Nama Siswa": s.name,
+                        "Kelas": s.className,
+                    };
+
+                    meetingsList.forEach(mName => {
+                        rowObj[mName] = s.meetingScores[mName] || '-';
+                    });
+
+                    rowObj["Rata-rata Pertemuan"] = s.meetingAvg;
+                    rowObj["Rata-rata Hafalan"] = s.hafalanAvg;
+                    rowObj["Nilai Akhir Keseluruhan"] = s.overallAvg;
+
+                    return rowObj;
+                });
 
                 if (exportData.length === 0) return alert('Tidak ada data nilai yang bisa diekspor.');
 
@@ -1245,8 +1545,8 @@
                 <div className="space-y-6 md:space-y-10 animate-in slide-in-from-bottom-4">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Rekap Data Nilai</h1>
-                            <p className="text-gray-400 mt-1 text-sm md:text-base font-medium">Rekapitulasi gabungan pertemuan dan hafalan tersusun alfabetis.</p>
+                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Rekap & Ekspor Nilai</h1>
+                            <p className="text-gray-400 mt-1 text-sm md:text-base font-medium">Rekapitulasi lengkap rincian pertemuan dan hafalan.</p>
                         </div>
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
                             <select value={selClass} onChange={e => setSelClass(e.target.value)} className="bg-white border border-gray-200 p-3.5 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm text-sm">
@@ -1264,18 +1564,32 @@
                             <table className="w-full text-left border-collapse">
                                 <thead className="bg-gray-900 text-white">
                                     <tr>
-                                        <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest sticky left-0 bg-gray-900 z-10">Nama Siswa</th>
+                                        <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest sticky left-0 bg-gray-900 z-10 min-w-[200px]">Nama Siswa</th>
                                         <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest">Kelas</th>
-                                        <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest text-center">Nilai Pertemuan (50% Kehadiran + 50% PH)</th>
-                                        <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest text-center">Rata-rata Hafalan</th>
-                                        <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest text-center bg-blue-950">Nilai Akhir Keseluruhan</th>
+                                        
+                                        {meetingsList.map(mName => (
+                                            <th key={mName} className="p-4 md:p-6 font-black text-xs uppercase tracking-widest text-center min-w-[120px] bg-gray-800/80">
+                                                {mName}
+                                            </th>
+                                        ))}
+
+                                        <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest text-center min-w-[150px]">Rata-rata Pertemuan</th>
+                                        <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest text-center min-w-[150px]">Rata-rata Hafalan</th>
+                                        <th className="p-4 md:p-6 font-black text-xs uppercase tracking-widest text-center bg-blue-950 min-w-[160px]">Nilai Akhir</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 bg-white">
                                     {tableRows.map(row => (
                                         <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="p-4 md:p-6 font-bold text-gray-800 sticky left-0 bg-white shadow-sm whitespace-nowrap text-sm md:text-base">{row.name}</td>
-                                            <td className="p-4 md:p-6 text-sm font-semibold text-gray-500">{row.className}</td>
+                                            <td className="p-4 md:p-6 text-sm font-semibold text-gray-500 whitespace-nowrap">{row.className}</td>
+                                            
+                                            {meetingsList.map(mName => (
+                                                <td key={mName} className="p-4 md:p-6 text-center font-bold text-gray-600 bg-gray-50/30">
+                                                    {row.meetingScores[mName]}
+                                                </td>
+                                            ))}
+
                                             <td className="p-4 md:p-6 text-center font-bold text-gray-700">
                                                 <span className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 font-black">{row.meetingAvg}</span>
                                             </td>
@@ -1289,7 +1603,7 @@
                                     ))}
                                     {tableRows.length === 0 && (
                                         <tr>
-                                            <td colSpan="5" className="p-10 text-center text-gray-400">Tidak ada siswa ditemukan.</td>
+                                            <td colSpan={4 + meetingsList.length} className="p-10 text-center text-gray-400">Tidak ada siswa ditemukan.</td>
                                         </tr>
                                     )}
                                 </tbody>
